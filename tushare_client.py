@@ -384,7 +384,8 @@ class TushareClient:
             "comshare_payable_dvd,capit_comstock_div,"
             # 隐藏字段（默认显示为 N）
             "net_after_nr_lp_correct,credit_impa_loss,net_expo_hedging_benefits,"
-            "oth_impair_loss_assets,total_opcost,asset_disp_income,oth_income,update_flag"
+            "oth_impair_loss_assets,total_opcost,asset_disp_income,oth_income,"
+            "amodcost_fin_assets,continued_net_profit,end_net_profit,update_flag"
         )
         
         params = {

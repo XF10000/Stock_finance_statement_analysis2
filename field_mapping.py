@@ -422,8 +422,11 @@ INCOME_FIELDS = {
     'net_expo_hedging_benefits': '净敞口套期收益',
     'oth_impair_loss_assets': '其他资产减值损失',
     'total_opcost': '营业总成本(新准则)',
-    'asset_disp_income': '资产处置收益',
+    'amodcost_fin_assets': '以摊余成本计量的金融资产终止确认收益',
     'oth_income': '其他收益',
+    'asset_disp_income': '资产处置收益',
+    'continued_net_profit': '持续经营净利润',
+    'end_net_profit': '终止经营净利润',
     'update_flag': '更新标识',
 }
 
