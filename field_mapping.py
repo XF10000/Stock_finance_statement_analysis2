@@ -200,6 +200,11 @@ BALANCESHEET_FIELDS = {
     # 资产总计
     'total_assets': '资产总计',
     
+    # 新增隐藏字段（新会计准则）
+    'use_right_assets': '使用权资产',
+    'oth_eq_invest': '其他权益工具投资',
+    'oth_illiq_fin_assets': '其他非流动金融资产',
+    
     # 流动负债
     'lt_borr': '长期借款',
     'st_borr': '短期借款',
@@ -255,6 +260,9 @@ BALANCESHEET_FIELDS = {
     'pledge_borr': '质押借款',
     'indem_payable': '应付赔付款',
     'policy_div_payable': '应付保单红利',
+    
+    # 新增隐藏字段（新会计准则）
+    'lease_liab': '租赁负债',
     
     # 负债合计
     'total_liab': '负债合计',

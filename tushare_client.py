@@ -288,13 +288,15 @@ class TushareClient:
             "treasury_share,ordin_risk_reser,forex_differ,invest_loss_unconf,"
             "minority_int,total_hldr_eqy_exc_min_int,total_hldr_eqy_inc_min_int,"
             "total_liab_hldr_eqy,lt_payroll_payable,oth_comp_income,lt_equity_invest,total_eqt,"
-            # 隐藏字段（默认显示为 N）
+            # 隐藏字段（默认显示为 N）- 重要财务字段
             "acc_receivable,accounts_pay,accounts_receiv_bill,cip_total,"
             "contract_assets,contract_liab,cost_fin_assets,debt_invest,"
             "fair_value_fin_assets,fix_assets_total,hfs_assets,hfs_sales,"
             "lending_funds,long_pay_total,oth_debt_invest,oth_eqt_tools,"
             "oth_eqt_tools_p_shr,oth_eq_ppbond,oth_pay_total,oth_rcv_total,"
-            "payables,st_fin_payable,update_flag"
+            "payables,st_fin_payable,"
+            # 新增隐藏字段（2024年新增，新会计准则）
+            "use_right_assets,oth_eq_invest,oth_illiq_fin_assets,lease_liab,update_flag"
         )
         
         params = {
