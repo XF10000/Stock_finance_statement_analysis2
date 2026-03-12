@@ -38,7 +38,7 @@ tushare:
 
 ### 1. 命令行方式
 
-获取单家公司的全部历史财务数据：
+获取单家公司的全部历史财务数据（默认中文列名）：
 
 ```bash
 python main.py 000001.SZ
@@ -62,10 +62,10 @@ python main.py 000858.SZ --format excel
 python main.py 000333.SZ --format both
 ```
 
-**使用中文列名**（推荐）：
+**使用英文列名**（不翻译）：
 
 ```bash
-python main.py 600519.SH --translate
+python main.py 600519.SH --no-translate
 ```
 
 ### 2. Python 代码方式
