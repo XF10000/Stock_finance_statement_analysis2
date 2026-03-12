@@ -16,8 +16,8 @@ def main():
     parser.add_argument('--output-dir', type=str, default='./data', help='数据输出目录')
     parser.add_argument('--format', type=str, choices=['csv', 'excel', 'both'], 
                        default='csv', help='输出格式（csv/excel/both）')
-    parser.add_argument('--transpose', action='store_true', 
-                       help='转置数据格式：字段纵向（行），时间横向（列）')
+    parser.add_argument('--no-transpose', action='store_true', 
+                       help='不转置数据（使用原始格式：字段横向，时间纵向）')
     parser.add_argument('--no-translate', action='store_true', help='不翻译字段名（使用英文列名）')
     parser.add_argument('--config', type=str, default='config.yaml', help='配置文件路径')
     
@@ -41,8 +41,12 @@ def main():
     else:
         print(f"字段名翻译: 英文")
     
-    if args.transpose:
-        print(f"数据格式: 转置（字段纵向，时间横向）")
+    # 默认转置数据格式
+    transpose = not args.no_transpose
+    if transpose:
+        print(f"数据格式: 转置（字段纵向，时间横向）- 便于分析")
+    else:
+        print(f"数据格式: 原始（字段横向，时间纵向）")
     
     data = client.get_all_financial_data(
         ts_code=args.ts_code,
@@ -54,10 +58,10 @@ def main():
     # 保存数据
     print(f"\n保存数据到: {args.output_dir}")
     if args.format in ['csv', 'both']:
-        client.save_to_csv(data, args.ts_code, args.output_dir, transpose=args.transpose)
+        client.save_to_csv(data, args.ts_code, args.output_dir, transpose=transpose)
     
     if args.format in ['excel', 'both']:
-        client.save_to_excel(data, args.ts_code, args.output_dir, transpose=args.transpose)
+        client.save_to_excel(data, args.ts_code, args.output_dir, transpose=transpose)
     
     # 显示数据摘要
     print("\n" + "="*60)

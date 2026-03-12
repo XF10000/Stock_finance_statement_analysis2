@@ -591,7 +591,7 @@ class TushareClient:
         return df_transposed
     
     def save_to_csv(self, data: Dict[str, Optional[pd.DataFrame]], ts_code: str, 
-                    output_dir: str = None, transpose: bool = False):
+                    output_dir: str = None, transpose: bool = True):
         """
         将数据保存为 CSV 文件
         
@@ -599,7 +599,7 @@ class TushareClient:
             data: 财务数据字典
             ts_code: 股票代码
             output_dir: 输出目录
-            transpose: 是否转置数据（字段纵向，时间横向）
+            transpose: 是否转置数据（字段纵向，时间横向），默认 True
         """
         if output_dir is None:
             output_dir = self.config['data']['output_dir']
@@ -617,7 +617,7 @@ class TushareClient:
                 self.logger.info(f"已保存: {filename}" + (" (转置格式)" if transpose else ""))
     
     def save_to_excel(self, data: Dict[str, Optional[pd.DataFrame]], ts_code: str, 
-                      output_dir: str = None, transpose: bool = False):
+                      output_dir: str = None, transpose: bool = True):
         """
         将数据保存为 Excel 文件（每个报表一个 sheet）
         
@@ -625,7 +625,7 @@ class TushareClient:
             data: 财务数据字典
             ts_code: 股票代码
             output_dir: 输出目录
-            transpose: 是否转置数据（字段纵向，时间横向）
+            transpose: 是否转置数据（字段纵向，时间横向），默认 True
         """
         if output_dir is None:
             output_dir = self.config['data']['output_dir']
