@@ -58,7 +58,9 @@ def main():
         if df is not None and len(df) > 0:
             print(f"{name:20s}: {len(df):6d} 条记录, {len(df.columns)} 个字段")
             if len(df) > 0:
-                print(f"  日期范围: {df['end_date'].min()} 至 {df['end_date'].max()}")
+                # 根据是否翻译选择列名
+                date_col = '报告期' if '报告期' in df.columns else 'end_date'
+                print(f"  日期范围: {df[date_col].min()} 至 {df[date_col].max()}")
         else:
             print(f"{name:20s}: 无数据")
     print("="*60)
