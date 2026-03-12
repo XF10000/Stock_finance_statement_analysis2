@@ -1,0 +1,47 @@
+# Tushare API 配置模板
+# 请复制此文件为 config.yaml 并填入你的 Token
+
+# Tushare API 配置
+tushare:
+  # Tushare API Token（请替换为你自己的 Token）
+  token: "YOUR_TUSHARE_TOKEN_HERE"
+  
+  # API 请求配置
+  api:
+    # 每次请求的间隔时间（秒），避免请求过于频繁
+    request_interval: 0.3
+    # 分页获取时每页的数据量
+    page_size: 5000
+    # 最大重试次数
+    max_retries: 3
+    # 重试间隔（秒）
+    retry_interval: 1
+
+# 数据存储配置
+data:
+  # 数据保存目录
+  output_dir: "./data"
+  
+  # 是否保存为 CSV 文件
+  save_csv: true
+  
+  # 是否保存为 Excel 文件
+  save_excel: false
+  
+  # 是否存储到数据库
+  save_database: false
+  
+  # 数据库配置（如果使用数据库）
+  database:
+    type: "sqlite"  # sqlite, mysql, postgresql
+    host: "localhost"
+    port: 3306
+    username: "root"
+    password: ""
+    database: "stock_finance"
+
+# 日志配置
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "./logs/tushare_client.log"

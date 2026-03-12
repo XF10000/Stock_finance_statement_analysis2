@@ -1,0 +1,200 @@
+# 股票财务数据获取工具
+
+基于 Tushare API 的股票财务数据获取工具，支持获取完整的财务报表数据（包括默认隐藏字段）。
+
+## 功能特性
+
+- ✅ 获取完整的财务数据（包括默认显示为 N 的隐藏字段）
+- ✅ 支持四大财务报表：财务指标表、资产负债表、利润表、现金流量表
+- ✅ 支持分页获取大数据量数据
+- ✅ 自动过滤上市前的无效数据
+- ✅ 支持指定日期范围查询
+- ✅ 支持导出为 CSV 或 Excel 格式
+- ✅ 完善的日志记录和错误处理
+
+## 安装依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+## 配置
+
+1. 复制配置文件模板：
+
+```bash
+cp config.yaml.example config.yaml
+```
+
+2. 编辑 `config.yaml`，填入你的 Tushare Token：
+
+```yaml
+tushare:
+  token: "你的Tushare Token"
+```
+
+## 使用方法
+
+### 1. 命令行方式
+
+获取单家公司的全部历史财务数据：
+
+```bash
+python main.py 000001.SZ
+```
+
+获取指定日期范围的数据：
+
+```bash
+python main.py 600519.SH --start-date 20200101 --end-date 20231231
+```
+
+保存为 Excel 格式：
+
+```bash
+python main.py 000858.SZ --format excel
+```
+
+同时保存 CSV 和 Excel：
+
+```bash
+python main.py 000333.SZ --format both
+```
+
+### 2. Python 代码方式
+
+```python
+from tushare_client import TushareClient
+
+# 初始化客户端
+client = TushareClient(config_path='config.yaml')
+
+# 获取全部财务数据
+data = client.get_all_financial_data('000001.SZ')
+
+# 保存数据
+client.save_to_csv(data, '000001.SZ')
+
+# 查看数据
+print(data['fina_indicator'].head())
+```
+
+### 3. 运行示例
+
+```bash
+python example_usage.py
+```
+
+## 数据说明
+
+### 获取的字段策略
+
+本项目获取**所有字段**，无论 Tushare 文档中标记的"默认显示"是 Y 还是 N。
+
+这是因为许多重要字段（如 `receiv_financing` 应收款项融资、`contract_assets` 合同资产等）默认不显示，但对财务分析非常重要。
+
+### 四大财务报表
+
+| 报表类型 | 字段数量 | 说明 |
+|---------|---------|------|
+| 财务指标表 (fina_indicator) | 约 180 个 | 综合财务指标，包括每股指标、盈利能力、营运能力、偿债能力等 |
+| 资产负债表 (balancesheet) | 约 156 个 | 反映企业特定时点的财务状况 |
+| 利润表 (income) | 约 94 个 | 反映企业一定时期内的经营成果 |
+| 现金流量表 (cashflow) | 约 99 个 | 反映企业现金流入和流出情况 |
+
+### 输出文件格式
+
+运行后会在 `data` 目录生成以下文件：
+
+```
+data/
+├── 000001.SZ_fina_indicator.csv   # 财务指标表
+├── 000001.SZ_balancesheet.csv      # 资产负债表
+├── 000001.SZ_income.csv            # 利润表
+└── 000001.SZ_cashflow.csv          # 现金流量表
+```
+
+如果选择 Excel 格式，会生成一个包含多个 sheet 的 Excel 文件。
+
+## API 方法说明
+
+### TushareClient 类
+
+#### 主要方法
+
+| 方法 | 说明 |
+|------|------|
+| `get_fina_indicator(ts_code, start_date, end_date)` | 获取财务指标表 |
+| `get_balancesheet(ts_code, start_date, end_date)` | 获取资产负债表 |
+| `get_income(ts_code, start_date, end_date)` | 获取利润表 |
+| `get_cashflow(ts_code, start_date, end_date)` | 获取现金流量表 |
+| `get_all_financial_data(ts_code, start_date, end_date)` | 获取全部财务数据 |
+| `save_to_csv(data, ts_code, output_dir)` | 保存为 CSV |
+| `save_to_excel(data, ts_code, output_dir)` | 保存为 Excel |
+
+#### 参数说明
+
+- `ts_code`: 股票代码，格式为 `代码.交易所`（如 `000001.SZ`）
+  - SZ: 深圳证券交易所
+  - SH: 上海证券交易所
+- `start_date`: 开始日期，格式 `YYYYMMDD`（可选）
+- `end_date`: 结束日期，格式 `YYYYMMDD`（可选）
+
+## 注意事项
+
+1. **Tushare 积分要求**：不同接口对积分有不同要求，积分不足可能导致部分数据无法获取
+2. **请求频率限制**：代码已内置请求间隔控制，避免触发 API 限流
+3. **数据量**：获取全部历史数据可能需要较长时间，建议在非高峰期运行
+4. **数据过滤**：自动过滤上市前的无效数据，确保数据准确性
+
+## 项目结构
+
+```
+Stock_finance_statement_analysis2/
+├── config.yaml              # 配置文件（包含 Token）
+├── requirements.txt         # Python 依赖
+├── tushare_client.py        # Tushare 客户端核心类
+├── main.py                  # 命令行入口
+├── example_usage.py         # 使用示例
+├── docs/
+│   └── Tushare_Fields_Documentation.md  # 字段文档
+├── data/                    # 数据输出目录
+└── logs/                    # 日志目录
+```
+
+## 常见问题
+
+### 1. Token 错误
+
+确保 `config.yaml` 中的 token 正确无误，且已复制到项目根目录。
+
+### 2. 积分不足
+
+部分高级接口需要足够的 Tushare 积分，可通过以下方式获取积分：
+- 注册并完善个人信息
+- 每日签到
+- 分享项目
+- 捐赠支持
+
+### 3. 数据为空
+
+可能原因：
+- 股票代码错误
+- 日期范围内无数据
+- 积分不足无法访问该接口
+
+### 4. 请求超时
+
+网络问题或 API 响应慢，代码会自动重试 3 次。
+
+## 参考文档
+
+- [Tushare 官方文档](https://tushare.pro/document/2)
+- [财务指标表接口](https://tushare.pro/document/2?doc_id=79)
+- [资产负债表接口](https://tushare.pro/document/2?doc_id=36)
+- [利润表接口](https://tushare.pro/document/2?doc_id=33)
+- [现金流量表接口](https://tushare.pro/document/2?doc_id=44)
+
+## License
+
+MIT License
