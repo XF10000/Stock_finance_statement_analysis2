@@ -16,6 +16,7 @@ def main():
     parser.add_argument('--output-dir', type=str, default='./data', help='数据输出目录')
     parser.add_argument('--format', type=str, choices=['csv', 'excel', 'both'], 
                        default='csv', help='输出格式（csv/excel/both）')
+    parser.add_argument('--translate', action='store_true', help='翻译字段名为中文')
     parser.add_argument('--config', type=str, default='config.yaml', help='配置文件路径')
     
     args = parser.parse_args()
@@ -31,10 +32,14 @@ def main():
     else:
         print(f"获取全部历史数据...")
     
+    if args.translate:
+        print(f"字段名翻译: 已启用")
+    
     data = client.get_all_financial_data(
         ts_code=args.ts_code,
         start_date=args.start_date,
-        end_date=args.end_date
+        end_date=args.end_date,
+        translate=args.translate
     )
     
     # 保存数据

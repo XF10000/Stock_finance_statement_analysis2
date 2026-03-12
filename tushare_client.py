@@ -10,6 +10,7 @@ from datetime import datetime
 import pandas as pd
 import tushare as ts
 import yaml
+from field_mapping import translate_columns
 
 
 class TushareClient:
@@ -156,7 +157,7 @@ class TushareClient:
         return None
     
     def get_fina_indicator(self, ts_code: str, start_date: Optional[str] = None,
-                          end_date: Optional[str] = None) -> Optional[pd.DataFrame]:
+                          end_date: Optional[str] = None, translate: bool = False) -> Optional[pd.DataFrame]:
         """
         获取财务指标表数据（约180个字段）
         
@@ -164,6 +165,7 @@ class TushareClient:
             ts_code: 股票代码
             start_date: 开始日期 (YYYYMMDD)
             end_date: 结束日期 (YYYYMMDD)
+            translate: 是否翻译字段名为中文
             
         Returns:
             财务指标 DataFrame 或 None
@@ -222,11 +224,14 @@ class TushareClient:
         
         if df is not None and len(df) > 0:
             self.logger.info(f"获取 {ts_code} 财务指标数据成功，共 {len(df)} 条记录")
+            # 翻译字段名
+            if translate:
+                df = translate_columns(df, 'fina_indicator')
         
         return df
     
     def get_balancesheet(self, ts_code: str, start_date: Optional[str] = None,
-                        end_date: Optional[str] = None) -> Optional[pd.DataFrame]:
+                        end_date: Optional[str] = None, translate: bool = False) -> Optional[pd.DataFrame]:
         """
         获取资产负债表数据（约156个字段）
         
@@ -234,6 +239,7 @@ class TushareClient:
             ts_code: 股票代码
             start_date: 开始日期 (YYYYMMDD)
             end_date: 结束日期 (YYYYMMDD)
+            translate: 是否翻译字段名为中文
             
         Returns:
             资产负债表 DataFrame 或 None
@@ -317,11 +323,14 @@ class TushareClient:
         
         if df is not None and len(df) > 0:
             self.logger.info(f"获取 {ts_code} 资产负债表数据成功，共 {len(df)} 条记录")
+            # 翻译字段名
+            if translate:
+                df = translate_columns(df, 'balancesheet')
         
         return df
     
     def get_income(self, ts_code: str, start_date: Optional[str] = None,
-                   end_date: Optional[str] = None) -> Optional[pd.DataFrame]:
+                   end_date: Optional[str] = None, translate: bool = False) -> Optional[pd.DataFrame]:
         """
         获取利润表数据（约94个字段）
         
@@ -329,6 +338,7 @@ class TushareClient:
             ts_code: 股票代码
             start_date: 开始日期 (YYYYMMDD)
             end_date: 结束日期 (YYYYMMDD)
+            translate: 是否翻译字段名为中文
             
         Returns:
             利润表 DataFrame 或 None
@@ -401,11 +411,14 @@ class TushareClient:
         
         if df is not None and len(df) > 0:
             self.logger.info(f"获取 {ts_code} 利润表数据成功，共 {len(df)} 条记录")
+            # 翻译字段名
+            if translate:
+                df = translate_columns(df, 'income')
         
         return df
     
     def get_cashflow(self, ts_code: str, start_date: Optional[str] = None,
-                     end_date: Optional[str] = None) -> Optional[pd.DataFrame]:
+                     end_date: Optional[str] = None, translate: bool = False) -> Optional[pd.DataFrame]:
         """
         获取现金流量表数据（约99个字段）
         
@@ -413,6 +426,7 @@ class TushareClient:
             ts_code: 股票代码
             start_date: 开始日期 (YYYYMMDD)
             end_date: 结束日期 (YYYYMMDD)
+            translate: 是否翻译字段名为中文
             
         Returns:
             现金流量表 DataFrame 或 None
@@ -496,11 +510,14 @@ class TushareClient:
         
         if df is not None and len(df) > 0:
             self.logger.info(f"获取 {ts_code} 现金流量表数据成功，共 {len(df)} 条记录")
+            # 翻译字段名
+            if translate:
+                df = translate_columns(df, 'cashflow')
         
         return df
     
     def get_all_financial_data(self, ts_code: str, start_date: Optional[str] = None,
-                               end_date: Optional[str] = None) -> Dict[str, Optional[pd.DataFrame]]:
+                               end_date: Optional[str] = None, translate: bool = False) -> Dict[str, Optional[pd.DataFrame]]:
         """
         获取某家公司的全部财务数据
         
@@ -508,6 +525,7 @@ class TushareClient:
             ts_code: 股票代码
             start_date: 开始日期 (YYYYMMDD)
             end_date: 结束日期 (YYYYMMDD)
+            translate: 是否翻译字段名为中文
             
         Returns:
             包含所有财务报表的字典
@@ -515,10 +533,10 @@ class TushareClient:
         self.logger.info(f"开始获取 {ts_code} 的完整财务数据...")
         
         result = {
-            'fina_indicator': self.get_fina_indicator(ts_code, start_date, end_date),
-            'balancesheet': self.get_balancesheet(ts_code, start_date, end_date),
-            'income': self.get_income(ts_code, start_date, end_date),
-            'cashflow': self.get_cashflow(ts_code, start_date, end_date)
+            'fina_indicator': self.get_fina_indicator(ts_code, start_date, end_date, translate),
+            'balancesheet': self.get_balancesheet(ts_code, start_date, end_date, translate),
+            'income': self.get_income(ts_code, start_date, end_date, translate),
+            'cashflow': self.get_cashflow(ts_code, start_date, end_date, translate)
         }
         
         # 统计数据

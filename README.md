@@ -1,14 +1,15 @@
 # 股票财务数据获取工具
 
-基于 Tushare API 的股票财务数据获取工具，支持获取完整的财务报表数据（包括默认隐藏字段）。
+基于 Tushare API 的股票财务数据获取工具，支持获取完整的财务报表数据（包括默认隐藏字段），并可将字段名翻译为中文。
 
 ## 功能特性
 
 - ✅ 获取完整的财务数据（包括默认显示为 N 的隐藏字段）
 - ✅ 支持四大财务报表：财务指标表、资产负债表、利润表、现金流量表
-- ✅ 支持分页获取大数据量数据
+- ✅ **字段名自动翻译**：可将英文字段名翻译为中文，方便理解和使用
 - ✅ 自动过滤上市前的无效数据
-- ✅ 支持指定日期范围查询
+- ✅ 支持分页获取大数据量数据
+- ✅ 支持错误重试机制
 - ✅ 支持导出为 CSV 或 Excel 格式
 - ✅ 完善的日志记录和错误处理
 
@@ -61,6 +62,12 @@ python main.py 000858.SZ --format excel
 python main.py 000333.SZ --format both
 ```
 
+**使用中文列名**（推荐）：
+
+```bash
+python main.py 600519.SH --translate
+```
+
 ### 2. Python 代码方式
 
 ```python
@@ -69,20 +76,49 @@ from tushare_client import TushareClient
 # 初始化客户端
 client = TushareClient(config_path='config.yaml')
 
-# 获取全部财务数据
+# 获取全部财务数据（英文字段）
 data = client.get_all_financial_data('000001.SZ')
 
-# 保存数据
-client.save_to_csv(data, '000001.SZ')
+# 获取全部财务数据（中文字段，推荐）
+data_cn = client.get_all_financial_data('000001.SZ', translate=True)
 
-# 查看数据
-print(data['fina_indicator'].head())
+# 保存数据
+client.save_to_csv(data_cn, '000001.SZ')
+
+# 查看数据（中文列名更易读）
+print(data_cn['fina_indicator'].head())
 ```
 
-### 3. 运行示例
+### 3. 字段翻译功能
+
+所有财务报表字段都支持中英文对照，包括：
+- **财务指标表**：180 个字段
+- **资产负债表**：156 个字段  
+- **利润表**：94 个字段
+- **现金流量表**：99 个字段
+
+**翻译对比示例：**
+
+| 英文字段名 | 中文含义 |
+|-----------|---------|
+| `eps` | 基本每股收益 |
+| `roe` | 净资产收益率 |
+| `accounts_receiv` | 应收账款 |
+| `total_assets` | 资产总计 |
+| `net_profit` | 净利润 |
+
+使用翻译功能后，输出的 CSV/Excel 文件将使用中文列名，更便于理解和分析。
+
+### 4. 运行示例
 
 ```bash
 python example_usage.py
+```
+
+### 5. 测试翻译功能
+
+```bash
+python test_translation.py
 ```
 
 ## 数据说明
