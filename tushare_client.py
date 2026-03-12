@@ -545,7 +545,53 @@ class TushareClient:
         
         return result
     
-    def save_to_csv(self, data: Dict[str, Optional[pd.DataFrame]], ts_code: str, output_dir: str = None):
+    def transpose_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        转置数据：字段纵向（行），时间横向（列）
+        
+        Args:
+            df: 原始 DataFrame
+            
+        Returns:
+            转置后的 DataFrame
+        """
+        if df is None or len(df) == 0:
+            return df
+        
+        # 标识列（不参与转置）
+        id_columns = ['ts_code', 'TS代码', 'TS股票代码', 'ann_date', '公告日期', 
+                      'f_ann_date', '实际公告日期', 'report_type', '报表类型',
+                      'comp_type', '公司类型', 'end_type', '报告期类型']
+        
+        # 找到日期列
+        date_col = None
+        for col in ['end_date', '报告期']:
+            if col in df.columns:
+                date_col = col
+                break
+        
+        if date_col is None:
+            self.logger.warning("未找到日期列，无法转置")
+            return df
+        
+        # 移除标识列，保留数据列
+        data_cols = [col for col in df.columns if col not in id_columns and col != date_col]
+        
+        # 转置：设置日期为列，字段为行
+        df_transposed = df[data_cols + [date_col]].set_index(date_col).T
+        df_transposed = df_transposed.reset_index()
+        df_transposed.columns.name = None
+        df_transposed = df_transposed.rename(columns={'index': '字段名'})
+        
+        # 按日期排序（从新到旧）
+        date_cols = [col for col in df_transposed.columns if col != '字段名']
+        date_cols_sorted = sorted(date_cols, reverse=True)
+        df_transposed = df_transposed[['字段名'] + date_cols_sorted]
+        
+        return df_transposed
+    
+    def save_to_csv(self, data: Dict[str, Optional[pd.DataFrame]], ts_code: str, 
+                    output_dir: str = None, transpose: bool = False):
         """
         将数据保存为 CSV 文件
         
@@ -553,6 +599,7 @@ class TushareClient:
             data: 财务数据字典
             ts_code: 股票代码
             output_dir: 输出目录
+            transpose: 是否转置数据（字段纵向，时间横向）
         """
         if output_dir is None:
             output_dir = self.config['data']['output_dir']
@@ -562,11 +609,15 @@ class TushareClient:
         
         for name, df in data.items():
             if df is not None and len(df) > 0:
+                # 转置数据
+                df_to_save = self.transpose_data(df) if transpose else df
+                
                 filename = f"{output_dir}/{ts_code}_{name}.csv"
-                df.to_csv(filename, index=False, encoding='utf-8-sig')
-                self.logger.info(f"已保存: {filename}")
+                df_to_save.to_csv(filename, index=False, encoding='utf-8-sig')
+                self.logger.info(f"已保存: {filename}" + (" (转置格式)" if transpose else ""))
     
-    def save_to_excel(self, data: Dict[str, Optional[pd.DataFrame]], ts_code: str, output_dir: str = None):
+    def save_to_excel(self, data: Dict[str, Optional[pd.DataFrame]], ts_code: str, 
+                      output_dir: str = None, transpose: bool = False):
         """
         将数据保存为 Excel 文件（每个报表一个 sheet）
         
@@ -574,6 +625,7 @@ class TushareClient:
             data: 财务数据字典
             ts_code: 股票代码
             output_dir: 输出目录
+            transpose: 是否转置数据（字段纵向，时间横向）
         """
         if output_dir is None:
             output_dir = self.config['data']['output_dir']
@@ -586,6 +638,8 @@ class TushareClient:
         with pd.ExcelWriter(filename, engine='openpyxl') as writer:
             for name, df in data.items():
                 if df is not None and len(df) > 0:
-                    df.to_excel(writer, sheet_name=name, index=False)
+                    # 转置数据
+                    df_to_save = self.transpose_data(df) if transpose else df
+                    df_to_save.to_excel(writer, sheet_name=name, index=False)
         
-        self.logger.info(f"已保存: {filename}")
+        self.logger.info(f"已保存: {filename}" + (" (转置格式)" if transpose else ""))

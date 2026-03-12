@@ -62,10 +62,26 @@ python main.py 000858.SZ --format excel
 python main.py 000333.SZ --format both
 ```
 
+**使用转置格式**（字段纵向，时间横向，便于对比分析）：
+
+```bash
+python main.py 600519.SH --transpose
+```
+
 **使用英文列名**（不翻译）：
 
 ```bash
 python main.py 600519.SH --no-translate
+```
+
+**组合使用**：
+
+```bash
+# 转置格式 + Excel 输出
+python main.py 000001.SZ --transpose --format excel
+
+# 英文列名 + 转置格式
+python main.py 000001.SZ --no-translate --transpose
 ```
 
 ### 2. Python 代码方式
@@ -89,7 +105,9 @@ client.save_to_csv(data_cn, '000001.SZ')
 print(data_cn['fina_indicator'].head())
 ```
 
-### 3. 字段翻译功能
+### 3. 数据格式说明
+
+#### 字段翻译功能
 
 **默认行为：所有字段名自动翻译为中文**
 
@@ -112,6 +130,27 @@ print(data_cn['fina_indicator'].head())
 默认输出的 CSV/Excel 文件使用中文列名，更便于理解和分析。
 
 如果需要英文列名，使用 `--no-translate` 参数或设置 `translate=False`。
+
+#### 数据转置功能
+
+**默认格式**（字段在列，时间在行）：
+```
+TS代码, 公告日期, 报告期, 基本每股收益, 净资产收益率, ...
+000001.SZ, 20250315, 20241231, 2.15, 10.08, ...
+000001.SZ, 20241019, 20240930, 1.94, 9.10, ...
+```
+
+**转置格式**（字段在行，时间在列）- 使用 `--transpose` 参数：
+```
+字段名, 20241231, 20240930, 20240630, ...
+基本每股收益, 2.15, 1.94, 1.23, ...
+净资产收益率, 10.08, 9.10, 5.79, ...
+```
+
+**转置格式的优势：**
+- 更容易对比不同时期的财务数据
+- 适合横向分析和趋势观察
+- Excel 中更方便查看大量字段
 
 ### 4. 运行示例
 
