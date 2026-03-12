@@ -7,10 +7,44 @@ from datetime import datetime
 from tushare_client import TushareClient
 
 
+def normalize_stock_code(ts_code: str) -> str:
+    """
+    规范化股票代码，自动补全交易所后缀
+    
+    Args:
+        ts_code: 股票代码（可以是纯数字或带后缀）
+        
+    Returns:
+        规范化后的股票代码（带交易所后缀）
+    
+    Examples:
+        '000333' -> '000333.SZ'
+        '600519' -> '600519.SH'
+        '000001.SZ' -> '000001.SZ'
+    """
+    # 如果已经有后缀，直接返回
+    if '.' in ts_code:
+        return ts_code.upper()
+    
+    # 补全代码到6位数字
+    code = ts_code.zfill(6)
+    
+    # 根据代码开头判断交易所
+    # 深圳：000、002、003、300开头
+    # 上海：600、601、603、605、688开头
+    if code.startswith(('000', '002', '003', '300')):
+        return f"{code}.SZ"
+    elif code.startswith(('600', '601', '603', '605', '688')):
+        return f"{code}.SH"
+    else:
+        # 默认深圳（兼容其他代码）
+        return f"{code}.SZ"
+
+
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(description='从 Tushare 获取公司财务数据')
-    parser.add_argument('ts_code', type=str, help='股票代码（例如：000001.SZ）')
+    parser.add_argument('ts_code', type=str, help='股票代码（例如：000333 或 600519.SH）')
     parser.add_argument('--start-date', type=str, help='开始日期（YYYYMMDD）')
     parser.add_argument('--end-date', type=str, help='结束日期（YYYYMMDD）')
     parser.add_argument('--output-dir', type=str, default='./data', help='数据输出目录')
@@ -23,12 +57,15 @@ def main():
     
     args = parser.parse_args()
     
+    # 规范化股票代码（自动补全交易所后缀）
+    ts_code = normalize_stock_code(args.ts_code)
+    
     # 初始化客户端
     print(f"初始化 Tushare 客户端...")
     client = TushareClient(config_path=args.config)
     
     # 获取财务数据
-    print(f"\n开始获取 {args.ts_code} 的财务数据...")
+    print(f"\n开始获取 {ts_code} 的财务数据...")
     if args.start_date:
         print(f"日期范围: {args.start_date} 至 {args.end_date or '至今'}")
     else:
@@ -49,7 +86,7 @@ def main():
         print(f"数据格式: 原始（字段横向，时间纵向）")
     
     data = client.get_all_financial_data(
-        ts_code=args.ts_code,
+        ts_code=ts_code,
         start_date=args.start_date,
         end_date=args.end_date,
         translate=translate
@@ -58,10 +95,10 @@ def main():
     # 保存数据
     print(f"\n保存数据到: {args.output_dir}")
     if args.format in ['csv', 'both']:
-        client.save_to_csv(data, args.ts_code, args.output_dir, transpose=transpose)
+        client.save_to_csv(data, ts_code, args.output_dir, transpose=transpose)
     
     if args.format in ['excel', 'both']:
-        client.save_to_excel(data, args.ts_code, args.output_dir, transpose=transpose)
+        client.save_to_excel(data, ts_code, args.output_dir, transpose=transpose)
     
     # 显示数据摘要
     print("\n" + "="*60)
