@@ -91,6 +91,8 @@ print(data_cn['fina_indicator'].head())
 
 ### 3. 字段翻译功能
 
+**默认行为：所有字段名自动翻译为中文**
+
 所有财务报表字段都支持中英文对照，包括：
 - **财务指标表**：180 个字段
 - **资产负债表**：156 个字段  
@@ -107,7 +109,9 @@ print(data_cn['fina_indicator'].head())
 | `total_assets` | 资产总计 |
 | `net_profit` | 净利润 |
 
-使用翻译功能后，输出的 CSV/Excel 文件将使用中文列名，更便于理解和分析。
+默认输出的 CSV/Excel 文件使用中文列名，更便于理解和分析。
+
+如果需要英文列名，使用 `--no-translate` 参数或设置 `translate=False`。
 
 ### 4. 运行示例
 

@@ -157,7 +157,7 @@ class TushareClient:
         return None
     
     def get_fina_indicator(self, ts_code: str, start_date: Optional[str] = None,
-                          end_date: Optional[str] = None, translate: bool = False) -> Optional[pd.DataFrame]:
+                          end_date: Optional[str] = None, translate: bool = True) -> Optional[pd.DataFrame]:
         """
         获取财务指标表数据（约180个字段）
         
@@ -231,7 +231,7 @@ class TushareClient:
         return df
     
     def get_balancesheet(self, ts_code: str, start_date: Optional[str] = None,
-                        end_date: Optional[str] = None, translate: bool = False) -> Optional[pd.DataFrame]:
+                        end_date: Optional[str] = None, translate: bool = True) -> Optional[pd.DataFrame]:
         """
         获取资产负债表数据（约156个字段）
         
@@ -330,7 +330,7 @@ class TushareClient:
         return df
     
     def get_income(self, ts_code: str, start_date: Optional[str] = None,
-                   end_date: Optional[str] = None, translate: bool = False) -> Optional[pd.DataFrame]:
+                   end_date: Optional[str] = None, translate: bool = True) -> Optional[pd.DataFrame]:
         """
         获取利润表数据（约94个字段）
         
@@ -418,7 +418,7 @@ class TushareClient:
         return df
     
     def get_cashflow(self, ts_code: str, start_date: Optional[str] = None,
-                     end_date: Optional[str] = None, translate: bool = False) -> Optional[pd.DataFrame]:
+                     end_date: Optional[str] = None, translate: bool = True) -> Optional[pd.DataFrame]:
         """
         获取现金流量表数据（约99个字段）
         
@@ -517,7 +517,7 @@ class TushareClient:
         return df
     
     def get_all_financial_data(self, ts_code: str, start_date: Optional[str] = None,
-                               end_date: Optional[str] = None, translate: bool = False) -> Dict[str, Optional[pd.DataFrame]]:
+                               end_date: Optional[str] = None, translate: bool = True) -> Dict[str, Optional[pd.DataFrame]]:
         """
         获取某家公司的全部财务数据
         
