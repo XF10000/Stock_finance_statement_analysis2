@@ -130,6 +130,48 @@ class TushareClient:
             return result
         return None
     
+    def _filter_by_update_flag(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        按 update_flag 筛选数据：优先选择更新版本(update_flag=1)，若没有则使用初始版本(update_flag=0)
+        
+        对于同一个报告期(end_date)，上市公司可能会发布多个版本：
+        - update_flag=0: 初始发布版本（可能包含错误）
+        - update_flag=1: 更新/修正版本（推荐使用）
+        
+        此方法确保每个报告期只保留最优版本，避免使用过时或错误的数据。
+        
+        Args:
+            df: 原始财务数据 DataFrame
+            
+        Returns:
+            筛选后的 DataFrame（每个报告期只保留一条记录）
+        """
+        if 'update_flag' not in df.columns or 'end_date' not in df.columns:
+            return df
+        
+        original_count = len(df)
+        
+        # 转换 update_flag 为数值类型（处理可能的字符串类型）
+        df['update_flag'] = pd.to_numeric(df['update_flag'], errors='coerce').fillna(0).astype(int)
+        
+        # 按报告期分组，优先选择 update_flag=1 的记录
+        # 使用 idxmax 找到每组中 update_flag 最大的记录索引
+        # 这样 update_flag=1 会优先于 update_flag=0
+        idx = df.groupby('end_date')['update_flag'].idxmax()
+        df_filtered = df.loc[idx].reset_index(drop=True)
+        
+        # 记录筛选信息
+        if len(df_filtered) < original_count:
+            removed_count = original_count - len(df_filtered)
+            updated_count = (df_filtered['update_flag'] == 1).sum()
+            initial_count = (df_filtered['update_flag'] == 0).sum()
+            self.logger.info(
+                f"update_flag 筛选: 原始 {original_count} 条 → 筛选后 {len(df_filtered)} 条 "
+                f"(移除 {removed_count} 条重复记录, 更新版 {updated_count} 条, 初始版 {initial_count} 条)"
+            )
+        
+        return df_filtered
+    
     def get_stock_list_date(self, ts_code: str) -> Optional[str]:
         """
         获取股票上市日期
@@ -221,6 +263,10 @@ class TushareClient:
                 df = df[df['end_date'] >= list_date]
                 if len(df) < original_count:
                     self.logger.info(f"{ts_code}: 过滤掉 {original_count - len(df)} 条上市前数据，上市日期: {list_date}")
+        
+        # 按报告期筛选 update_flag：优先选择更新版本(update_flag=1)，若没有则使用初始版本(update_flag=0)
+        if df is not None and len(df) > 0:
+            df = self._filter_by_update_flag(df)
         
         if df is not None and len(df) > 0:
             self.logger.info(f"获取 {ts_code} 财务指标数据成功，共 {len(df)} 条记录")
@@ -323,6 +369,10 @@ class TushareClient:
                 if len(df) < original_count:
                     self.logger.info(f"{ts_code}: 过滤掉 {original_count - len(df)} 条上市前数据，上市日期: {list_date}")
         
+        # 按报告期筛选 update_flag：优先选择更新版本(update_flag=1)，若没有则使用初始版本(update_flag=0)
+        if df is not None and len(df) > 0:
+            df = self._filter_by_update_flag(df)
+        
         if df is not None and len(df) > 0:
             self.logger.info(f"获取 {ts_code} 资产负债表数据成功，共 {len(df)} 条记录")
             # 翻译字段名
@@ -411,6 +461,10 @@ class TushareClient:
                 df = df[df['end_date'] >= list_date]
                 if len(df) < original_count:
                     self.logger.info(f"{ts_code}: 过滤掉 {original_count - len(df)} 条上市前数据，上市日期: {list_date}")
+        
+        # 按报告期筛选 update_flag：优先选择更新版本(update_flag=1)，若没有则使用初始版本(update_flag=0)
+        if df is not None and len(df) > 0:
+            df = self._filter_by_update_flag(df)
         
         if df is not None and len(df) > 0:
             self.logger.info(f"获取 {ts_code} 利润表数据成功，共 {len(df)} 条记录")
@@ -510,6 +564,10 @@ class TushareClient:
                 df = df[df['end_date'] >= list_date]
                 if len(df) < original_count:
                     self.logger.info(f"{ts_code}: 过滤掉 {original_count - len(df)} 条上市前数据，上市日期: {list_date}")
+        
+        # 按报告期筛选 update_flag：优先选择更新版本(update_flag=1)，若没有则使用初始版本(update_flag=0)
+        if df is not None and len(df) > 0:
+            df = self._filter_by_update_flag(df)
         
         if df is not None and len(df) > 0:
             self.logger.info(f"获取 {ts_code} 现金流量表数据成功，共 {len(df)} 条记录")

@@ -45,3 +45,9 @@ logging:
   level: "INFO"  # DEBUG, INFO, WARNING, ERROR
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   file: "./logs/tushare_client.log"
+
+# 财务报表重构配置
+restructure:
+  # 股权资本成本率（用于计算股权价值增加值）
+  # 股权资本成本 = 所有者权益合计 × 股权资本成本率
+  equity_cost_rate: 0.08
