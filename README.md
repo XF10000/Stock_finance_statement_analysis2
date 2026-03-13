@@ -63,7 +63,51 @@ python main.py 600519.SH
 
 ## 使用方法
 
-### 1. 命令行方式
+### 1. 一键生成完整财务分析（推荐）
+
+**只需一条命令，自动完成所有分析**：
+
+```bash
+python3 main.py 603345
+```
+
+**自动生成内容**：
+1. ✅ **历史财务报表重构**（季度数据）
+   - 资产负债表重构
+   - 利润表重构（股权价值增加表）
+   - 现金流量表重构
+
+2. ✅ **年度财务报表+TTM**（覆盖所有历史年份）
+   - 年度资产负债表+TTM
+   - 年度利润表+TTM
+   - 年度现金流量表+TTM
+
+3. ✅ **HTML交互式财务分析报告**
+   - 利润分析图表
+   - 资产负债分析图表
+   - 经营效率分析图表（包括ROIC）
+   - 支持时间轴缩放、数据点查看等交互功能
+
+**示例公司**：
+```bash
+python3 main.py 603345  # 安井食品（推荐样例）
+python3 main.py 000333  # 美的集团
+python3 main.py 600900  # 长江电力
+```
+
+**输出文件**：
+```
+data/
+├── 603345.SH_balancesheet_restructured.csv      # 重构后的资产负债表
+├── 603345.SH_income_restructured.csv            # 重构后的利润表
+├── 603345.SH_cashflow_restructured.csv          # 重构后的现金流量表
+├── 603345.SH_balance_sheet_annual_ttm.csv       # 年报+TTM资产负债表
+├── 603345.SH_income_statement_annual_ttm.csv    # 年报+TTM利润表
+├── 603345.SH_cashflow_statement_annual_ttm.csv  # 年报+TTM现金流量表
+└── 603345.SH_financial_report.html              # HTML财务分析报告 ⭐
+```
+
+### 2. 命令行方式（基础数据获取）
 
 获取单家公司的全部历史财务数据（默认：中文列名 + 转置格式）：
 

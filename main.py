@@ -60,10 +60,12 @@ def main():
                        help='不转置数据（使用原始格式：字段横向，时间纵向）')
     parser.add_argument('--no-translate', action='store_true', help='不翻译字段名（使用英文列名）')
     parser.add_argument('--config', type=str, default='config.yaml', help='配置文件路径')
-    parser.add_argument('--annual-ttm', action='store_true', 
-                       help='生成年报+TTM重构报表（过去10年年报+最新一期TTM）')
-    parser.add_argument('--years', type=int, default=10, 
-                       help='年报年数（默认10年，仅当--annual-ttm时有效）')
+    parser.add_argument('--annual-ttm', action='store_true', default=True,
+                       help='生成年报+TTM重构报表（默认开启，使用--no-annual-ttm关闭）')
+    parser.add_argument('--no-annual-ttm', action='store_true',
+                       help='不生成年报+TTM数据')
+    parser.add_argument('--years', type=int, default=None, 
+                       help='年报年数（默认覆盖所有历史数据）')
     
     args = parser.parse_args()
     
@@ -226,8 +228,8 @@ def main():
         except Exception as e:
             print(f"⚠️  现金流量表重构失败: {e}")
     
-    # 生成年报+TTM重构报表
-    if args.annual_ttm:
+    # 生成年报+TTM重构报表（默认开启，除非使用--no-annual-ttm）
+    if args.annual_ttm and not args.no_annual_ttm:
         print(f"\n" + "="*60)
         print("生成年报+TTM重构报表...")
         print("="*60)
@@ -242,10 +244,28 @@ def main():
                 # 初始化生成器
                 annual_generator = AnnualReportGenerator()
                 
+                # 如果years为None，计算覆盖所有历史数据的年数
+                years = args.years
+                if years is None:
+                    # 获取所有日期列
+                    date_cols = [col for col in balance_restructured.columns if col != '项目']
+                    if date_cols:
+                        # 找到最早和最新的年份
+                        years_list = [int(col[:4]) for col in date_cols if len(col) >= 4 and col[:4].isdigit()]
+                        if years_list:
+                            min_year = min(years_list)
+                            max_year = max(years_list)
+                            years = max_year - min_year + 1
+                            print(f"覆盖所有历史数据：{min_year}年至{max_year}年，共{years}年")
+                        else:
+                            years = 10  # 默认10年
+                    else:
+                        years = 10  # 默认10年
+                
                 # 生成年报+TTM数据
                 annual_reports = annual_generator.generate_annual_reports_with_ttm(
                     balance_restructured, income_restructured, cashflow_restructured, 
-                    years=args.years
+                    years=years
                 )
                 
                 # 保存年报+TTM报表
@@ -311,6 +331,45 @@ def main():
         else:
             print(f"{name:30s}: 无数据")
     print("="*60)
+    
+    # 自动生成HTML报告
+    if args.annual_ttm and not args.no_annual_ttm:
+        print("\n" + "="*60)
+        print("生成HTML财务分析报告...")
+        print("="*60)
+        
+        try:
+            from html_report_generator import HTMLReportGenerator
+            
+            # 检查是否有年报+TTM数据
+            balance_ttm = data.get('balance_sheet_annual_ttm')
+            income_ttm = data.get('income_statement_annual_ttm')
+            cashflow_ttm = data.get('cashflow_statement_annual_ttm')
+            
+            if balance_ttm is not None and income_ttm is not None and cashflow_ttm is not None:
+                # 获取公司名称（从股票代码推断，或使用默认值）
+                company_name_map = {
+                    '000333.SZ': '美的集团',
+                    '600900.SH': '长江电力',
+                    '603345.SH': '安井食品'
+                }
+                company_name = company_name_map.get(ts_code, ts_code.split('.')[0])
+                
+                # 生成HTML报告
+                html_filename = os.path.join(args.output_dir, f"{ts_code}_financial_report.html")
+                generator = HTMLReportGenerator(company_name=company_name, stock_code=ts_code)
+                generator.generate_report(
+                    balance_ttm, income_ttm, cashflow_ttm,
+                    output_path=html_filename
+                )
+                
+                print(f"\n提示: 在浏览器中打开该文件即可查看交互式财务分析报告")
+            else:
+                print("⚠️  缺少年报+TTM数据，无法生成HTML报告")
+        except Exception as e:
+            print(f"⚠️  生成HTML报告失败: {e}")
+            import traceback
+            traceback.print_exc()
     
     print(f"\n完成！数据已保存到 {args.output_dir}")
 

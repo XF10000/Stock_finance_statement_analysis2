@@ -150,14 +150,29 @@ class AnnualReportGenerator:
         # 构建结果DataFrame
         result_data = {}
         
+        # 获取所有可用的日期列（按降序排列）
+        all_date_cols = sorted([col for col in df.columns if col != '项目'], reverse=True)
+        
         for _, row in df.iterrows():
             item_name = row['项目']
             result_data[item_name] = {}
             
             # 添加TTM数据（如果不是Q4）
             if latest_quarter != 4:
-                if latest_date in df.columns:
-                    result_data[item_name][ttm_label] = row.get(latest_date, np.nan)
+                # 尝试获取最新季度的数据
+                value = row.get(latest_date, np.nan) if latest_date in df.columns else np.nan
+                
+                # 如果最新季度数据为空，向前查找最近一期有数据的季度
+                if pd.isna(value):
+                    for date_col in all_date_cols:
+                        if date_col <= latest_date:  # 只查找不晚于最新日期的数据
+                            temp_value = row.get(date_col, np.nan)
+                            if pd.notna(temp_value):
+                                value = temp_value
+                                self.logger.debug(f"{item_name}: {latest_date}数据为空，使用{date_col}的数据")
+                                break
+                
+                result_data[item_name][ttm_label] = value
             
             # 添加年报数据
             for date in annual_dates:

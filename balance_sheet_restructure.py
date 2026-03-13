@@ -283,7 +283,7 @@ OPERATING_LIABILITIES_FIELDS = [
 LONG_TERM_OPERATING_ASSETS_FIELDS = [
     '固定资产', '固定资产合计', '在建工程合计', '生产性生物资产', '公益性生物资产', '油气资产',
     '使用权资产', '无形资产', '开发支出', '商誉', '长期待摊费用',
-    '递延所得税资产', '其他非流动资产'
+    '其他非流动资产', '递延所得税资产'
 ]
 
 # 短期债务字段列表
@@ -465,7 +465,30 @@ def restructure_balance_sheet(df: pd.DataFrame) -> pd.DataFrame:
                 val = df_data.loc[field]
                 if isinstance(val, pd.DataFrame):
                     val = val.iloc[0]
-                restructured_data[field] = val
+                
+                # 特殊处理固定资产：如果为空，使用固定资产合计的值
+                if field == '固定资产':
+                    # 获取固定资产合计的值
+                    fix_assets_total_val = None
+                    if '固定资产合计' in df_data.index:
+                        try:
+                            fix_assets_total_val = df_data.loc['固定资产合计']
+                            if isinstance(fix_assets_total_val, pd.DataFrame):
+                                fix_assets_total_val = fix_assets_total_val.iloc[0]
+                        except:
+                            pass
+                    
+                    # 逐期填充：如果固定资产为空，使用固定资产合计
+                    if fix_assets_total_val is not None:
+                        merged_val = val.copy()
+                        for date_col in date_columns:
+                            if pd.isna(merged_val.get(date_col)) and pd.notna(fix_assets_total_val.get(date_col)):
+                                merged_val[date_col] = fix_assets_total_val.get(date_col)
+                        restructured_data[field] = merged_val
+                    else:
+                        restructured_data[field] = val
+                else:
+                    restructured_data[field] = val
             except:
                 pass
     
@@ -552,7 +575,8 @@ def restructure_balance_sheet(df: pd.DataFrame) -> pd.DataFrame:
             val = df_data.loc['少数股东权益']
             if isinstance(val, pd.DataFrame):
                 val = val.iloc[0]
-            minority_interest = val
+            # 将NaN填充为0，避免影响所有者权益合计的计算
+            minority_interest = pd.to_numeric(val, errors='coerce').fillna(0)
         except:
             minority_interest = pd.Series(0, index=date_columns)
     else:
@@ -831,30 +855,44 @@ def _calculate_long_term_operating_assets(df: pd.DataFrame,
     """
     total = pd.Series(0.0, index=date_columns)
     
-    # 处理固定资产字段：优先使用固定资产合计
-    fixed_assets_used = False
+    # 处理固定资产字段：逐期判断，优先使用固定资产合计的非空值
+    fixed_assets_values = pd.Series(0.0, index=date_columns)
+    
+    # 获取两个字段的数据
+    fix_assets_total = None
+    fix_assets = None
+    
     if '固定资产合计' in df.index:
         try:
             val = df.loc['固定资产合计']
             if isinstance(val, pd.DataFrame):
                 val = val.iloc[0]
-            values = pd.to_numeric(val, errors='coerce').fillna(0)
-            if values.sum() > 0:  # 只有在有值的情况下才使用
-                total = total + values
-                fixed_assets_used = True
+            fix_assets_total = pd.to_numeric(val, errors='coerce')
         except Exception as e:
-            logging.warning(f"计算固定资产合计时出错: {e}")
+            logging.warning(f"读取固定资产合计时出错: {e}")
     
-    # 如果没有使用固定资产合计，尝试使用固定资产
-    if not fixed_assets_used and '固定资产' in df.index:
+    if '固定资产' in df.index:
         try:
             val = df.loc['固定资产']
             if isinstance(val, pd.DataFrame):
                 val = val.iloc[0]
-            values = pd.to_numeric(val, errors='coerce').fillna(0)
-            total = total + values
+            fix_assets = pd.to_numeric(val, errors='coerce')
         except Exception as e:
-            logging.warning(f"计算固定资产时出错: {e}")
+            logging.warning(f"读取固定资产时出错: {e}")
+    
+    # 逐期判断：优先使用固定资产合计的非空值
+    for date in date_columns:
+        value = 0.0
+        # 优先使用固定资产合计
+        if fix_assets_total is not None and pd.notna(fix_assets_total.get(date)):
+            value = fix_assets_total.get(date, 0.0)
+        # 如果固定资产合计为空，使用固定资产
+        elif fix_assets is not None and pd.notna(fix_assets.get(date)):
+            value = fix_assets.get(date, 0.0)
+        
+        fixed_assets_values[date] = value if pd.notna(value) else 0.0
+    
+    total = total + fixed_assets_values
     
     # 处理其他字段（排除固定资产和固定资产合计）
     for field in LONG_TERM_OPERATING_ASSETS_FIELDS:

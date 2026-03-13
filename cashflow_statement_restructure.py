@@ -367,18 +367,49 @@ def restructure_cashflow_statement(
             # 按日期升序排列（从旧到新）
             sorted_dates = sorted(date_columns)
             
-            prev_assets = None
+            # 构建年报数据字典（只包含1231结尾的日期）
+            annual_assets = {}
             for col in sorted_dates:
                 if col in asset_row.columns:
                     val = asset_row[col].values[0]
                     if pd.notna(val):
-                        current_assets = val
-                        longterm_operating_assets[col] = current_assets  # 期末值
-                        
-                        if prev_assets is not None:
-                            # 期初值 = 上一个报告期的期末值
-                            longterm_operating_assets_begin[col] = prev_assets
-                        prev_assets = current_assets
+                        longterm_operating_assets[col] = val  # 期末值
+                        if col.endswith('1231'):
+                            annual_assets[col] = val
+            
+            # 计算期初长期资产
+            for col in sorted_dates:
+                if col in asset_row.columns:
+                    val = asset_row[col].values[0]
+                    if pd.notna(val):
+                        # 如果是年报（1231结尾），期初 = 上一年年报
+                        if col.endswith('1231'):
+                            year = int(col[:4])
+                            prev_year_date = f"{year-1}1231"
+                            if prev_year_date in annual_assets:
+                                longterm_operating_assets_begin[col] = annual_assets[prev_year_date]
+                        else:
+                            # 如果是季报，期初 = 同年上一季度或上年年报
+                            year = int(col[:4])
+                            month_day = col[4:]
+                            
+                            # 找到上一个报告期
+                            if month_day == '0331':
+                                # Q1的期初 = 上年年报
+                                prev_date = f"{year-1}1231"
+                            elif month_day == '0630':
+                                # Q2的期初 = 当年Q1
+                                prev_date = f"{year}0331"
+                            elif month_day == '0930':
+                                # Q3的期初 = 当年Q2
+                                prev_date = f"{year}0630"
+                            else:
+                                prev_date = None
+                            
+                            if prev_date and prev_date in asset_row.columns:
+                                prev_val = asset_row[prev_date].values[0]
+                                if pd.notna(prev_val):
+                                    longterm_operating_assets_begin[col] = prev_val
     
     restructured_data['长期经营资产合计'] = longterm_operating_assets
     
