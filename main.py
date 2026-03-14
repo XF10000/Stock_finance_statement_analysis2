@@ -11,6 +11,147 @@ from cashflow_statement_restructure import restructure_cashflow_statement
 from annual_report_generator import AnnualReportGenerator
 import os
 import yaml
+import pandas as pd
+import time
+
+
+def get_total_share_data(client: TushareClient, ts_code: str, balance_df: pd.DataFrame) -> dict:
+    """
+    获取总股本数据
+    
+    Args:
+        client: TushareClient实例
+        ts_code: 股票代码
+        balance_df: 资产负债表数据
+        
+    Returns:
+        字典，key为报告期（YYYYMMDD格式），value为总股本（股）
+    """
+    if balance_df is None or len(balance_df) == 0:
+        return None
+    
+    # 获取所有报告期
+    end_date_col = '报告期' if '报告期' in balance_df.columns else 'end_date'
+    if end_date_col not in balance_df.columns:
+        return None
+    
+    report_dates = balance_df[end_date_col].unique()
+    total_share_dict = {}
+    
+    for report_date in report_dates:
+        try:
+            # 提取年份
+            year = str(report_date)[:4]
+            
+            # 查询该年度12月的交易日数据
+            start_date = f"{year}1201"
+            end_date = f"{year}1231"
+            
+            df = client.pro.daily_basic(
+                ts_code=ts_code,
+                start_date=start_date,
+                end_date=end_date,
+                fields='trade_date,total_share'
+            )
+            
+            if df is not None and len(df) > 0:
+                # 取最后一个交易日的总股本
+                df = df.sort_values('trade_date', ascending=False)
+                total_share = df['total_share'].values[0] * 10000 if pd.notna(df['total_share'].values[0]) else None
+                total_share_dict[str(report_date)] = total_share
+            
+            # API限流
+            time.sleep(0.3)
+        except Exception as e:
+            print(f"  获取 {report_date} 总股本失败: {e}")
+            continue
+    
+    return total_share_dict if total_share_dict else None
+
+
+def add_total_share_to_balance(df_balance: pd.DataFrame, total_share_data: dict) -> pd.DataFrame:
+    """
+    将总股本数据添加到资产负债表中
+    
+    Args:
+        df_balance: 重构后的资产负债表
+        total_share_data: 总股本数据字典
+        
+    Returns:
+        添加了总股本行的资产负债表
+    """
+    # 创建总股本行
+    total_share_row = {'项目': '总股本'}
+    
+    # 获取所有日期列
+    date_columns = [col for col in df_balance.columns if col != '项目']
+    
+    for col in date_columns:
+        # 将列名转换为YYYYMMDD格式
+        col_key = col.replace('/', '').replace('-', '').replace('Q3-TTM', '')
+        if 'TTM' in col:
+            col_key = col[:4] + '1231'  # TTM使用当年12月31日
+        
+        total_share_row[col] = total_share_data.get(col_key)
+    
+    # 将总股本行添加到资产负债表末尾
+    df_result = pd.concat([df_balance, pd.DataFrame([total_share_row])], ignore_index=True)
+    
+    return df_result
+
+
+def get_dividend_data(client: TushareClient, ts_code: str, output_dir: str) -> pd.DataFrame:
+    """
+    获取分红送股数据并保存为Excel文件
+    
+    Args:
+        client: TushareClient实例
+        ts_code: 股票代码
+        output_dir: 输出目录
+        
+    Returns:
+        分红送股数据DataFrame
+    """
+    try:
+        # 获取分红数据
+        df = client.pro.dividend(
+            ts_code=ts_code,
+            fields='end_date,ann_date,div_proc,stk_div,stk_bo_rate,stk_co_rate,cash_div,cash_div_tax,record_date,ex_date,pay_date,div_listdate,imp_ann_date'
+        )
+        
+        if df is None or len(df) == 0:
+            print("  未获取到分红数据")
+            return None
+        
+        # 按报告期排序
+        df = df.sort_values('end_date', ascending=False)
+        
+        # 重命名列为中文
+        df_renamed = df.rename(columns={
+            'end_date': '报告期',
+            'ann_date': '公告日期',
+            'div_proc': '分红进度',
+            'stk_div': '送股比例',
+            'stk_bo_rate': '转增比例',
+            'stk_co_rate': '配股比例',
+            'cash_div': '每股派息(税前)',
+            'cash_div_tax': '每股派息(税后)',
+            'record_date': '股权登记日',
+            'ex_date': '除权除息日',
+            'pay_date': '派息日',
+            'div_listdate': '红股上市日',
+            'imp_ann_date': '实施公告日'
+        })
+        
+        # 保存为Excel
+        excel_filename = os.path.join(output_dir, f"{ts_code}_分红送股.xlsx")
+        df_renamed.to_excel(excel_filename, index=False)
+        print(f"✓ 分红送股数据已保存到: {excel_filename}")
+        
+        return df_renamed
+    except Exception as e:
+        print(f"  获取分红数据失败: {e}")
+        return None
 
 
 def normalize_stock_code(ts_code: str) -> str:
@@ -112,6 +253,26 @@ def main():
     if args.format in ['excel', 'both']:
         client.save_to_excel(data, ts_code, args.output_dir, transpose=transpose)
     
+    # 获取总股本数据
+    print(f"\n获取总股本数据...")
+    total_share_data = None
+    try:
+        total_share_data = get_total_share_data(client, ts_code, data.get('balancesheet'))
+        if total_share_data:
+            print(f"✓ 成功获取 {len(total_share_data)} 个报告期的总股本数据")
+    except Exception as e:
+        print(f"⚠️  获取总股本数据失败: {e}")
+    
+    # 获取分红数据
+    print(f"\n获取分红送股数据...")
+    try:
+        dividend_df = get_dividend_data(client, ts_code, args.output_dir)
+        if dividend_df is not None:
+            print(f"✓ 成功获取分红送股数据，共 {len(dividend_df)} 条记录")
+            data['dividend'] = dividend_df
+    except Exception as e:
+        print(f"⚠️  获取分红送股数据失败: {e}")
+    
     # 重构资产负债表
     if data.get('balancesheet') is not None and len(data['balancesheet']) > 0:
         print(f"\n重构资产负债表...")
@@ -122,6 +283,11 @@ def main():
             
             # 重构资产负债表
             df_restructured = restructure_balance_sheet(df_transposed)
+            
+            # 将总股本数据添加到重构的资产负债表中
+            if total_share_data:
+                df_restructured = add_total_share_to_balance(df_restructured, total_share_data)
+                print(f"✓ 总股本数据已添加到资产负债表")
             
             # 保存重构后的数据
             restructured_filename = os.path.join(args.output_dir, f"{ts_code}_balancesheet_restructured.csv")
@@ -370,8 +536,8 @@ def main():
             print(f"⚠️  生成HTML报告失败: {e}")
             import traceback
             traceback.print_exc()
-    
-    print(f"\n完成！数据已保存到 {args.output_dir}")
+        
+        print(f"\n完成！数据已保存到 {args.output_dir}")
 
 
 if __name__ == '__main__':

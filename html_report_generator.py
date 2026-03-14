@@ -94,10 +94,7 @@ class HTMLReportGenerator:
         
         charts_config.extend(profit_charts)
         
-        # 3. 现金流分析图表
-        charts_config.extend(self._generate_cashflow_charts(cashflow_data, date_columns))
-        
-        # 4. 经营效率分析图表
+        # 3. 经营效率分析图表
         efficiency_charts = self._generate_efficiency_charts(balance_data, income_data, date_columns)
         
         # 为图表添加计算字段
@@ -115,7 +112,7 @@ class HTMLReportGenerator:
         
         charts_config.extend(efficiency_charts)
         
-        # 5. 财务成本分析图表
+        # 4. 财务成本分析图表
         finance_cost_charts = self._generate_finance_cost_charts(income_data, date_columns)
         
         # 为图表添加计算字段
@@ -125,7 +122,7 @@ class HTMLReportGenerator:
         
         charts_config.extend(finance_cost_charts)
         
-        # 6. 长期资产投资和并购活动分析图表
+        # 5. 长期资产投资和并购活动分析图表
         capex_charts = self._generate_capex_charts(balance_data, cashflow_data, date_columns)
         
         # 为图表添加计算字段
@@ -135,7 +132,7 @@ class HTMLReportGenerator:
         
         charts_config.extend(capex_charts)
         
-        # 7. 投资收益分析图表
+        # 6. 投资收益分析图表
         investment_income_charts = self._generate_investment_income_charts(balance_data, income_data, date_columns)
         
         # 为图表添加计算字段
@@ -144,6 +141,10 @@ class HTMLReportGenerator:
                 self._add_investment_income_calculations(chart, balance_data, income_data, date_columns)
         
         charts_config.extend(investment_income_charts)
+        
+        # 7. 自由现金流分析图表（FCFF和FCFE）
+        fcf_charts = self._generate_fcf_charts(balance_data, income_data, cashflow_data, date_columns)
+        charts_config.extend(fcf_charts)
         
         # 生成HTML内容
         html_content = self._generate_html_template(charts_config, date_columns)
@@ -1365,19 +1366,19 @@ class HTMLReportGenerator:
         # 按类型分组图表
         balance_charts = []
         profit_charts = []
-        cashflow_charts = []
         efficiency_charts = []
         finance_cost_charts = []
         capex_charts = []
         investment_income_charts = []
+        fcf_charts = []
         
         for chart in charts_config:
-            if 'assets' in chart['id'] or 'capital' in chart['id'] or 'long_term' in chart['id'] or 'working_capital' in chart['id']:
+            if 'fcff' in chart['id'] or 'fcfe' in chart['id']:
+                fcf_charts.append(chart)
+            elif 'assets' in chart['id'] or 'capital' in chart['id'] or 'long_term' in chart['id'] or 'working_capital' in chart['id']:
                 balance_charts.append(chart)
             elif 'revenue' in chart['id'] or 'ebit' in chart['id'] or 'operating_expenses' in chart['id']:
                 profit_charts.append(chart)
-            elif 'cashflow' in chart['id']:
-                cashflow_charts.append(chart)
             elif 'roic' in chart['id'] or 'efficiency' in chart['id'] or 'turnover' in chart['id']:
                 efficiency_charts.append(chart)
             elif 'finance_cost' in chart['id']:
@@ -1400,11 +1401,11 @@ class HTMLReportGenerator:
         
         balance_containers = generate_section_charts(balance_charts)
         profit_containers = generate_section_charts(profit_charts)
-        cashflow_containers = generate_section_charts(cashflow_charts)
         efficiency_containers = generate_section_charts(efficiency_charts)
         finance_cost_containers = generate_section_charts(finance_cost_charts)
         capex_containers = generate_section_charts(capex_charts)
         investment_income_containers = generate_section_charts(investment_income_charts)
+        fcf_containers = generate_section_charts(fcf_charts)
         
         # 生成图表初始化JavaScript
         chart_scripts = ""
@@ -1506,28 +1507,28 @@ class HTMLReportGenerator:
         </div>
         
         <div class="section">
-            <h2 class="section-title">三、现金流分析</h2>
-            {cashflow_containers}
-        </div>
-        
-        <div class="section">
-            <h2 class="section-title">四、经营效率分析</h2>
+            <h2 class="section-title">三、经营效率分析</h2>
             {efficiency_containers}
         </div>
         
         <div class="section">
-            <h2 class="section-title">五、财务成本分析</h2>
+            <h2 class="section-title">四、财务成本分析</h2>
             {finance_cost_containers}
         </div>
         
         <div class="section">
-            <h2 class="section-title">六、长期资产投资和并购活动分析</h2>
+            <h2 class="section-title">五、长期资产投资和并购活动分析</h2>
             {capex_containers}
         </div>
         
         <div class="section">
-            <h2 class="section-title">七、投资收益分析</h2>
+            <h2 class="section-title">六、投资收益分析</h2>
             {investment_income_containers}
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">七、自由现金流分析</h2>
+            {fcf_containers}
         </div>
         
         <div class="footer">
@@ -1538,6 +1539,15 @@ class HTMLReportGenerator:
     <script>
         // 图表初始化
         {chart_scripts}
+        
+        // 时间轴同步缩放 - 使用ECharts的connect功能
+        var allCharts = [{', '.join([f"chart_{chart['id']}" for chart in charts_config])}];
+        
+        // 使用ECharts的group功能实现图表联动
+        echarts.connect('financialReportGroup');
+        allCharts.forEach(function(chart) {{
+            chart.group = 'financialReportGroup';
+        }});
         
         // 响应式调整
         window.addEventListener('resize', function() {{
@@ -1610,6 +1620,10 @@ class HTMLReportGenerator:
                     # 使用stack_config中定义的堆叠组
                     series_item['stack'] = field_to_stack[field_name]
                 series_item['barMaxWidth'] = 50
+                # 添加barGap和barCategoryGap配置
+                bar_category_gap = chart_config.get('bar_category_gap', '20%')
+                series_item['barGap'] = '5%'
+                series_item['barCategoryGap'] = bar_category_gap
                 if show_values:
                     # 根据bar_format选择格式化标记
                     formatter = '__FORMATTER_DECIMAL__' if bar_format == 'decimal' else '__FORMATTER_INT__'
@@ -1647,8 +1661,9 @@ class HTMLReportGenerator:
         
         # 生成JavaScript配置
         script = f'''
+        var chart_{chart_id};
         (function() {{
-            var chart_{chart_id} = echarts.init(document.getElementById('{chart_id}'));
+            chart_{chart_id} = echarts.init(document.getElementById('{chart_id}'));
             var option_{chart_id} = {{
                 title: {{
                     text: '{title}',
@@ -1777,6 +1792,359 @@ class HTMLReportGenerator:
         for chart in charts_config:
             resize_calls.append(f"echarts.init(document.getElementById('{chart['id']}')).resize();")
         return "\n            ".join(resize_calls)
+    
+    def _generate_fcf_charts(
+        self,
+        balance_df: pd.DataFrame,
+        income_df: pd.DataFrame,
+        cashflow_df: pd.DataFrame,
+        date_columns: List[str]
+    ) -> List[Dict]:
+        """生成自由现金流分析图表配置（FCFF和FCFE）"""
+        charts = []
+        
+        # 图表1: 根据EBIT计算的FCFF
+        chart1 = self._generate_fcff_ebit_chart(balance_df, income_df, cashflow_df, date_columns)
+        charts.append(chart1)
+        
+        # 图表2: FCFE vs Dividend
+        chart2 = self._generate_fcfe_dividend_chart(balance_df, income_df, cashflow_df, date_columns)
+        charts.append(chart2)
+        
+        return charts
+    
+    def _generate_fcff_ebit_chart(
+        self,
+        balance_df: pd.DataFrame,
+        income_df: pd.DataFrame,
+        cashflow_df: pd.DataFrame,
+        date_columns: List[str]
+    ) -> Dict:
+        """生成根据EBIT计算的FCFF图表"""
+        
+        # 从利润表提取数据
+        息税前经营利润_row = income_df[income_df['项目'] == '息税前经营利润']
+        实际所得税税率_row = income_df[income_df['项目'] == '实际所得税税率']
+        
+        # 从现金流量表提取数据
+        固定资产折旧_row = cashflow_df[cashflow_df['项目'] == '固定资产折旧、油气资产折耗、生产性生物资产折旧']
+        无形资产摊销_row = cashflow_df[cashflow_df['项目'] == '无形资产摊销']
+        长期待摊费用摊销_row = cashflow_df[cashflow_df['项目'] == '长期待摊费用摊销']
+        处置损失_row = cashflow_df[cashflow_df['项目'] == '处置固定资产、无形资产和其他长期资产的损失']
+        固定资产报废损失_row = cashflow_df[cashflow_df['项目'] == '固定资产报废损失']
+        资本支出总额_row = cashflow_df[cashflow_df['项目'] == '资本支出总额']
+        
+        # 从资产负债表提取数据
+        周转性经营投入_row = balance_df[balance_df['项目'] == '周转性经营投入合计']
+        
+        # 计算各项指标
+        息税前经营利润税后_data = []
+        折旧及摊销合计_data = []
+        资本支出总额_data = []
+        营运资本变化量_data = []
+        FCFF_data = []
+        
+        for i, col in enumerate(date_columns):
+            # 1. 息税前经营利润税后
+            ebit = 息税前经营利润_row[col].values[0] if len(息税前经营利润_row) > 0 else 0
+            tax_rate = 实际所得税税率_row[col].values[0] if len(实际所得税税率_row) > 0 else 0
+            
+            if pd.notna(ebit) and pd.notna(tax_rate):
+                ebit_after_tax = float(ebit) * (1 - float(tax_rate))
+                息税前经营利润税后_data.append(round(ebit_after_tax / 1e8, 0))
+            else:
+                ebit_after_tax = 0
+                息税前经营利润税后_data.append(None)
+            
+            # 2. 折旧及摊销合计
+            dep1 = 固定资产折旧_row[col].values[0] if len(固定资产折旧_row) > 0 else 0
+            dep2 = 无形资产摊销_row[col].values[0] if len(无形资产摊销_row) > 0 else 0
+            dep3 = 长期待摊费用摊销_row[col].values[0] if len(长期待摊费用摊销_row) > 0 else 0
+            dep4 = 处置损失_row[col].values[0] if len(处置损失_row) > 0 else 0
+            dep5 = 固定资产报废损失_row[col].values[0] if len(固定资产报废损失_row) > 0 else 0
+            
+            total_dep = 0
+            for dep in [dep1, dep2, dep3, dep4, dep5]:
+                if pd.notna(dep):
+                    total_dep += float(dep)
+            
+            if total_dep != 0:
+                折旧及摊销合计_data.append(round(total_dep / 1e8, 0))
+            else:
+                折旧及摊销合计_data.append(None)
+            
+            # 3. 资本支出
+            capex = 资本支出总额_row[col].values[0] if len(资本支出总额_row) > 0 else 0
+            if pd.notna(capex):
+                资本支出总额_data.append(round(float(capex) / 1e8, 0))
+            else:
+                资本支出总额_data.append(None)
+            
+            # 4. 营运资本变化量
+            current_wc = 周转性经营投入_row[col].values[0] if len(周转性经营投入_row) > 0 else 0
+            if i < len(date_columns) - 1:
+                next_col = date_columns[i+1]
+                prev_wc = 周转性经营投入_row[next_col].values[0] if len(周转性经营投入_row) > 0 else 0
+                if pd.notna(current_wc) and pd.notna(prev_wc):
+                    wc_change = float(current_wc) - float(prev_wc)
+                    营运资本变化量_data.append(round(wc_change / 1e8, 0))
+                else:
+                    wc_change = 0
+                    营运资本变化量_data.append(None)
+            else:
+                wc_change = 0
+                营运资本变化量_data.append(None)
+            
+            # 5. FCFF = 息税前经营利润税后 + 折旧摊销 - 资本支出 - 营运资本变化量
+            fcff = ebit_after_tax + total_dep
+            if pd.notna(capex):
+                fcff -= float(capex)
+            fcff -= wc_change
+            FCFF_data.append(round(fcff / 1e8, 0))
+        
+        # 构建图表配置
+        chart = {
+            'id': 'chart_fcff_ebit',
+            'title': '根据息税前经营利润计算的FCFF',
+            'type': 'bar',
+            'data': {
+                'dates': date_columns,
+                'series': {
+                    '息税前经营利润': {
+                        'type': 'bar',
+                        'data': 息税前经营利润税后_data
+                    },
+                    '折旧及摊销合计': {
+                        'type': 'bar',
+                        'data': 折旧及摊销合计_data
+                    },
+                    '资本支出总额': {
+                        'type': 'bar',
+                        'data': 资本支出总额_data
+                    },
+                    '营运资本变化量': {
+                        'type': 'bar',
+                        'data': 营运资本变化量_data
+                    },
+                    'FCFF': {
+                        'type': 'bar',
+                        'data': FCFF_data
+                    }
+                }
+            },
+            'colors': {
+                '息税前经营利润': '#70AD47',
+                '折旧及摊销合计': '#FFC000',
+                '资本支出总额': '#5B9BD5',
+                '营运资本变化量': '#ED7D31',
+                'FCFF': '#A5A5A5'
+            },
+            'bar_category_gap': '40%'  # 增加年度之间的间距
+        }
+        
+        return chart
+    
+    def _generate_fcfe_dividend_chart(
+        self,
+        balance_df: pd.DataFrame,
+        income_df: pd.DataFrame,
+        cashflow_df: pd.DataFrame,
+        date_columns: List[str]
+    ) -> Dict:
+        """生成FCFE vs Dividend图表"""
+        
+        # 从利润表提取数据
+        净利润_row = income_df[income_df['项目'] == '净利润']
+        
+        # 从现金流量表提取数据
+        固定资产折旧_row = cashflow_df[cashflow_df['项目'] == '固定资产折旧、油气资产折耗、生产性生物资产折旧']
+        无形资产摊销_row = cashflow_df[cashflow_df['项目'] == '无形资产摊销']
+        长期待摊费用摊销_row = cashflow_df[cashflow_df['项目'] == '长期待摊费用摊销']
+        处置损失_row = cashflow_df[cashflow_df['项目'] == '处置固定资产、无形资产和其他长期资产的损失']
+        固定资产报废损失_row = cashflow_df[cashflow_df['项目'] == '固定资产报废损失']
+        资本支出总额_row = cashflow_df[cashflow_df['项目'] == '资本支出总额']
+        
+        # 从资产负债表提取数据
+        周转性经营投入_row = balance_df[balance_df['项目'] == '周转性经营投入合计']
+        有息债务_row = balance_df[balance_df['项目'] == '有息债务合计']
+        
+        # 计算FCFE
+        FCFE_data = []
+        
+        for i, col in enumerate(date_columns):
+            # 1. 净利润
+            净利润 = 净利润_row[col].values[0] if len(净利润_row) > 0 else 0
+            
+            # 2. 折旧及摊销合计（包含5个项目）
+            dep1 = 固定资产折旧_row[col].values[0] if len(固定资产折旧_row) > 0 else 0
+            dep2 = 无形资产摊销_row[col].values[0] if len(无形资产摊销_row) > 0 else 0
+            dep3 = 长期待摊费用摊销_row[col].values[0] if len(长期待摊费用摊销_row) > 0 else 0
+            dep4 = 处置损失_row[col].values[0] if len(处置损失_row) > 0 else 0
+            dep5 = 固定资产报废损失_row[col].values[0] if len(固定资产报废损失_row) > 0 else 0
+            
+            total_dep = 0
+            for dep in [dep1, dep2, dep3, dep4, dep5]:
+                if pd.notna(dep):
+                    total_dep += float(dep)
+            
+            # 3. 资本支出总额
+            capex = 资本支出总额_row[col].values[0] if len(资本支出总额_row) > 0 else 0
+            
+            # 4. 营运资本变化量（当期 - 上期）
+            current_wc = 周转性经营投入_row[col].values[0] if len(周转性经营投入_row) > 0 else 0
+            if i < len(date_columns) - 1:
+                next_col = date_columns[i+1]
+                prev_wc = 周转性经营投入_row[next_col].values[0] if len(周转性经营投入_row) > 0 else 0
+                if pd.notna(current_wc) and pd.notna(prev_wc):
+                    wc_change = float(current_wc) - float(prev_wc)
+                else:
+                    wc_change = 0
+            else:
+                wc_change = 0
+            
+            # 5. 债务变化（当期 - 上期）
+            current_debt = 有息债务_row[col].values[0] if len(有息债务_row) > 0 else 0
+            if i < len(date_columns) - 1:
+                next_col = date_columns[i+1]
+                prev_debt = 有息债务_row[next_col].values[0] if len(有息债务_row) > 0 else 0
+                if pd.notna(current_debt) and pd.notna(prev_debt):
+                    debt_change = float(current_debt) - float(prev_debt)
+                else:
+                    debt_change = 0
+            else:
+                debt_change = 0
+            
+            # 6. FCFE = 净利润 + 折旧摊销 - 资本支出 - 营运资本变化量 + 债务变化
+            if pd.notna(净利润):
+                fcfe = float(净利润) + total_dep
+                if pd.notna(capex):
+                    fcfe -= float(capex)
+                fcfe -= wc_change
+                fcfe += debt_change
+                FCFE_data.append(round(fcfe / 1e8, 0))
+            else:
+                FCFE_data.append(None)
+        
+        # 读取分红数据
+        分红_data = self._get_dividend_data(date_columns)
+        
+        # 构建图表配置
+        chart = {
+            'id': 'chart_fcfe_dividend',
+            'title': '股权自由现金流VS分红',
+            'type': 'line',
+            'data': {
+                'dates': date_columns,
+                'series': {
+                    'FCFE': {
+                        'type': 'line',
+                        'data': FCFE_data
+                    },
+                    '分红': {
+                        'type': 'line',
+                        'data': 分红_data
+                    }
+                }
+            },
+            'colors': {
+                'FCFE': '#5470C6',
+                '分红': '#EE6666'
+            }
+        }
+        
+        return chart
+    
+    def _get_dividend_data(self, date_columns: List[str]) -> List:
+        """从分红送股文件读取分红数据"""
+        import os
+        
+        # 读取分红送股.xlsx文件
+        dividend_file = f'data/{self.stock_code}_分红送股.xlsx'
+        
+        if not os.path.exists(dividend_file):
+            print(f"警告: 未找到分红送股文件: {dividend_file}")
+            return [None] * len(date_columns)
+        
+        try:
+            df = pd.read_excel(dividend_file)
+            
+            if df is None or len(df) == 0:
+                return [None] * len(date_columns)
+            
+            # 处理列名
+            if '报告期' in df.columns:
+                df['end_date'] = df['报告期']
+            if '每股派息(税后)' in df.columns:
+                df['cash_div_tax'] = df['每股派息(税后)']
+            if '每股派息(税前)' in df.columns:
+                df['cash_div'] = df['每股派息(税前)']
+            
+            # 转换日期格式
+            df['end_date'] = pd.to_datetime(df['end_date'], format='%Y%m%d').dt.strftime('%Y%m%d')
+            df['year'] = df['end_date'].str[:4]
+            df['month'] = df['end_date'].str[4:6]
+            
+            # 优先使用cash_div_tax，其次cash_div
+            df['dividend'] = df.apply(lambda row: row['cash_div_tax'] if pd.notna(row['cash_div_tax']) and row['cash_div_tax'] > 0 else (row['cash_div'] if pd.notna(row['cash_div']) else 0), axis=1)
+            
+            # 去除重复记录
+            df = df.sort_values('dividend', ascending=False).drop_duplicates(subset=['end_date'], keep='first')
+            
+            # 按年份汇总每股派息
+            year_dividend_dict = {}
+            year_q1q3_dividend_dict = {}
+            
+            for _, row in df.iterrows():
+                year = row['year']
+                month = row['month']
+                cash_div = row['dividend']
+                
+                if cash_div > 0:
+                    if year not in year_dividend_dict:
+                        year_dividend_dict[year] = 0
+                    year_dividend_dict[year] += cash_div
+                    
+                    if month in ['03', '06', '09']:
+                        if year not in year_q1q3_dividend_dict:
+                            year_q1q3_dividend_dict[year] = 0
+                        year_q1q3_dividend_dict[year] += cash_div
+            
+            # 读取总股本数据
+            balance_file = f'data/{self.stock_code}_balance_sheet_annual_ttm.csv'
+            total_share_dict = {}
+            
+            if os.path.exists(balance_file):
+                balance_df = pd.read_csv(balance_file, encoding='utf-8-sig')
+                total_share_row = balance_df[balance_df['项目'] == '总股本']
+                
+                if len(total_share_row) > 0:
+                    for col in date_columns:
+                        if col in total_share_row.columns:
+                            val = total_share_row[col].values[0]
+                            if pd.notna(val):
+                                total_share_dict[col] = val
+            
+            # 匹配日期列并计算分红总额
+            dividend_data = []
+            for col in date_columns:
+                year = col[:4]
+                is_ttm = 'TTM' in col or 'Q3' in col
+                
+                if is_ttm:
+                    cash_div_per_share = year_q1q3_dividend_dict.get(year, 0)
+                else:
+                    cash_div_per_share = year_dividend_dict.get(year, 0)
+                
+                if cash_div_per_share > 0 and col in total_share_dict:
+                    total_dividend = cash_div_per_share * total_share_dict[col]
+                    dividend_data.append(round(total_dividend / 1e8, 0))
+                else:
+                    dividend_data.append(None)
+            
+            return dividend_data
+        except Exception as e:
+            print(f"读取分红数据失败: {e}")
+            return [None] * len(date_columns)
 
 
 if __name__ == '__main__':

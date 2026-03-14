@@ -66,13 +66,13 @@ class SummaryExcelGenerator:
             balance_ttm_df, income_ttm_df, cashflow_ttm_df, date_columns
         )
         
-        # 获取总股本数据
-        total_share_data = self._get_total_share_data(stock_code, date_columns)
+        # 从资产负债表读取总股本数据
+        total_share_data = self._get_total_share_from_balance(balance_annual_df, date_columns)
         annual_data['总股本'] = total_share_data
         ttm_data['总股本'] = total_share_data
         
-        # 获取分红数据（需要总股本数据来计算分红总额）
-        dividend_data = self._get_dividend_data(stock_code, date_columns, total_share_data)
+        # 从分红送股.xlsx读取分红数据
+        dividend_data = self._get_dividend_from_file(stock_code, date_columns, total_share_data)
         
         # 创建Excel文件
         self._create_excel(annual_data, ttm_data, dividend_data, date_columns, output_path)
@@ -181,59 +181,54 @@ class SummaryExcelGenerator:
             data.append(val if pd.notna(val) else None)
         return data
     
-    def _get_total_share_data(self, stock_code: str, date_columns: List[str]) -> List:
-        """从Tushare获取总股本数据"""
+    def _get_total_share_from_balance(self, balance_df: pd.DataFrame, date_columns: List[str]) -> List:
+        """从资产负债表读取总股本数据"""
         try:
-            import time
-            # 获取每日基本指标数据
-            total_share_data = []
+            # 查找总股本行
+            total_share_row = balance_df[balance_df['项目'] == '总股本']
             
-            for date_col in date_columns:
-                # 提取年份和期间
-                year = date_col[:4]
-                
-                # 尝试获取该年度12月的数据（使用期间查询）
-                start_date = f"{year}1201"
-                end_date = f"{year}1231"
-                
-                df = self.pro.daily_basic(
-                    ts_code=stock_code, 
-                    start_date=start_date,
-                    end_date=end_date,
-                    fields='trade_date,total_share'
-                )
-                
-                if df is not None and len(df) > 0:
-                    # 取最后一个交易日的总股本
-                    df = df.sort_values('trade_date', ascending=False)
-                    total_share = df['total_share'].values[0] * 10000 if pd.notna(df['total_share'].values[0]) else None
-                    total_share_data.append(total_share)
-                    print(f"获取 {year} 年末总股本: {total_share}")
-                else:
-                    print(f"警告: {year} 年末无总股本数据")
-                    total_share_data.append(None)
-                
-                # API限流，每次请求间隔0.3秒
-                time.sleep(0.3)
+            if len(total_share_row) == 0:
+                print("警告: 资产负债表中未找到总股本数据")
+                return [None] * len(date_columns)
+            
+            # 提取总股本数据
+            total_share_data = []
+            for col in date_columns:
+                val = total_share_row[col].values[0] if col in total_share_row.columns else None
+                total_share_data.append(val if pd.notna(val) else None)
             
             return total_share_data
         except Exception as e:
-            print(f"获取总股本数据失败: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"从资产负债表读取总股本失败: {e}")
             return [None] * len(date_columns)
     
-    def _get_dividend_data(self, stock_code: str, date_columns: List[str], total_share_data: List) -> List:
-        """从Tushare获取分红数据"""
+    def _get_dividend_from_file(self, stock_code: str, date_columns: List[str], total_share_data: List) -> List:
+        """从分红送股.xlsx文件读取分红数据"""
         try:
-            # 获取分红数据
-            df = self.pro.dividend(ts_code=stock_code, fields='end_date,stk_div,stk_bo_rate,stk_co_rate,cash_div,cash_div_tax')
+            import os
+            # 读取分红送股.xlsx文件
+            dividend_file = f'data/{stock_code}_分红送股.xlsx'
             
-            if df is None or len(df) == 0:
+            if not os.path.exists(dividend_file):
+                print(f"警告: 未找到分红送股文件: {dividend_file}")
                 return [None] * len(date_columns)
             
+            df = pd.read_excel(dividend_file)
+            
+            if df is None or len(df) == 0:
+                print("警告: 分红送股文件为空")
+                return [None] * len(date_columns)
+            
+            # 处理列名（可能是中文或英文）
+            if '报告期' in df.columns:
+                df['end_date'] = df['报告期']
+            if '每股派息(税后)' in df.columns:
+                df['cash_div_tax'] = df['每股派息(税后)']
+            if '每股派息(税前)' in df.columns:
+                df['cash_div'] = df['每股派息(税前)']
+            
             # 将end_date转换为YYYYMMDD格式，并提取年份和月份
-            df['end_date'] = pd.to_datetime(df['end_date']).dt.strftime('%Y%m%d')
+            df['end_date'] = pd.to_datetime(df['end_date'], format='%Y%m%d').dt.strftime('%Y%m%d')
             df['year'] = df['end_date'].str[:4]
             df['month'] = df['end_date'].str[4:6]
             
@@ -282,13 +277,12 @@ class SummaryExcelGenerator:
                     # 每股派息单位是元，总股本单位是股，结果单位是元
                     total_dividend = cash_div_per_share * total_share_data[i]
                     dividend_data.append(total_dividend)
-                    print(f"{year}年分红: 每股{cash_div_per_share}元 × {total_share_data[i]}股 = {total_dividend}元")
                 else:
                     dividend_data.append(None)
             
             return dividend_data
         except Exception as e:
-            print(f"获取分红数据失败: {e}")
+            print(f"从分红送股文件读取数据失败: {e}")
             import traceback
             traceback.print_exc()
             return [None] * len(date_columns)
