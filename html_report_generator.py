@@ -1659,6 +1659,14 @@ class HTMLReportGenerator:
             
             series_list.append(series_item)
         
+        # 计算dataZoom的start值，默认显示最近10年
+        total_dates = len(data['dates'])
+        if total_dates <= 10:
+            zoom_start = 0
+        else:
+            # 计算显示最后10个数据点的start百分比
+            zoom_start = ((total_dates - 10) / total_dates) * 100
+        
         # 生成JavaScript配置
         script = f'''
         var chart_{chart_id};
@@ -1716,14 +1724,14 @@ class HTMLReportGenerator:
                         type: 'slider',
                         show: true,
                         xAxisIndex: [0],
-                        start: 0,
+                        start: {zoom_start:.2f},
                         end: 100,
                         bottom: 0
                     }},
                     {{
                         type: 'inside',
                         xAxisIndex: [0],
-                        start: 0,
+                        start: {zoom_start:.2f},
                         end: 100
                     }}
                 ],
