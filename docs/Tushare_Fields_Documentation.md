@@ -2,6 +2,9 @@
 
 本文档包含了 Tushare API 提供的财务报表字段信息，包括资产负债表、利润表和现金流量表的所有字段。
 
+**最后更新**: 2026-03-14
+**更新内容**: 修正了现金流量表补充资料部分的字段映射错误，所有映射现已与 Tushare API 实际返回完全一致。
+
 ## 重要说明
 
 ### 字段获取策略
@@ -637,32 +640,31 @@ def get_balancesheet(self, ts_code: str, start_date: Optional[str] = None,
 | depr_fa_coga_dpba | float | Y | 固定资产折旧、油气资产折耗、生产性生物资产折旧 |
 | amort_intang_assets | float | Y | 无形资产摊销 |
 | lt_amort_deferred_exp | float | Y | 长期待摊费用摊销 |
-| decr_deferred_exp | float | Y | 处置固定资产、无形资产和其他长期资产的损失 |
-| incr_acc_exp | float | Y | 固定资产报废损失 |
-| loss_disp_fiolta | float | Y | 公允价值变动损失 |
-| loss_scr_fa | float | Y | 投资损失 |
-| loss_fv_chg | float | Y | 递延所得税资产减少 |
-| invest_loss | float | Y | 递延所得税负债增加 |
-| decr_def_inc_tax_assets | float | Y | 存货的减少 |
-| incr_def_inc_tax_liab | float | Y | 经营性应收项目的减少 |
-| decr_inventories | float | Y | 经营性应付项目的增加 |
-| decr_oper_payable | float | Y | 其他 |
-| incr_oper_payable | float | Y | 经营活动产生的现金流量净额 |
-| others | float | Y | 债务转为资本 |
-| im_net_cashflow_oper_act | float | Y | 一年内到期的可转换公司债券 |
-| conv_debt_into_cap | float | Y | 融资租入固定资产 |
-| conv_copbonds_due_within_1y | float | Y | 现金的期末余额 |
-| fa_fnc_leases | float | Y | 现金的期初余额 |
-| im_n_incr_cash_equ | float | Y | 现金等价物的期末余额 |
-| net_dism_capital_add | float | Y | 现金等价物的期初余额 |
-| net_cash_rece_sec | float | Y | 信用减值损失 |
-| credit_impa_loss | float | Y | 使用权资产折旧 |
-| use_right_assets_dep | float | Y | 其他资产损失 |
-| oth_loss_asset | float | Y | 更新标识 |
-| end_bal_cash | float | Y | 现金及现金等价物余额 |
-| beg_bal_cash | float | Y | 期初现金及现金等价物余额 |
-| end_bal_cash_equ | float | Y | 期末现金及现金等价物余额 |
-| beg_bal_cash_equ | float | Y | 期初现金及现金等价物余额 |
+| decr_deferred_exp | float | Y | 待摊费用减少 |
+| incr_acc_exp | float | Y | 待摊费用增加 |
+| loss_disp_fiolta | float | Y | 处置固定资产、无形资产和其他长期资产的损失 |
+| loss_scr_fa | float | Y | 固定资产报废损失 |
+| loss_fv_chg | float | Y | 公允价值变动损失 |
+| invest_loss | float | Y | 投资损失 |
+| decr_def_inc_tax_assets | float | Y | 递延所得税资产减少 |
+| incr_def_inc_tax_liab | float | Y | 递延所得税负债增加 |
+| decr_inventories | float | Y | 存货的减少 |
+| decr_oper_payable | float | Y | 经营性应收项目的减少 |
+| incr_oper_payable | float | Y | 经营性应付项目的增加 |
+| others | float | Y | 其他 |
+| im_net_cashflow_oper_act | float | Y | 经营活动产生的现金流量净额(间接法) |
+| conv_debt_into_cap | float | Y | 债务转为资本 |
+| conv_copbonds_due_within_1y | float | Y | 一年内到期的可转换公司债券 |
+| fa_fnc_leases | float | Y | 融资租入固定资产 |
+| im_n_incr_cash_equ | float | Y | 现金及现金等价物净增加额(间接法) |
+| net_dism_capital_add | float | Y | 净减少资本 |
+| net_cash_rece_sec | float | Y | 收到的证券净额 |
+| credit_impa_loss | float | N | 信用减值损失 |
+| oth_loss_asset | float | Y | 其他资产损失 |
+| end_bal_cash | float | Y | 现金的期末余额 |
+| beg_bal_cash | float | Y | 现金的期初余额 |
+| end_bal_cash_equ | float | Y | 现金等价物的期末余额 |
+| beg_bal_cash_equ | float | Y | 现金等价物的期初余额 |
 | update_flag | string | Y | 更新标识 |
 
 ## 4. 数据库模型对应关系
@@ -674,3 +676,45 @@ def get_balancesheet(self, ts_code: str, start_date: Optional[str] = None,
 - `models.py` 中的 `Balancesheet` 类对应资产负债表
 
 所有字段名称与 Tushare API 保持一致，确保数据的完整性和准确性。
+
+## 5. 字段映射修正说明 (2026-03-14)
+
+### 修正的问题
+
+在之前的版本中，现金流量表补充资料部分（第640-666行）的字段映射存在严重的错位问题，每个字段的中文描述都对应到了下一个或下下个字段。
+
+### 修正的字段
+
+**现金流量表补充资料部分：**
+
+| 字段名 | 修正前（错误） | 修正后（正确） |
+|--------|---------------|---------------|
+| `decr_deferred_exp` | 处置固定资产、无形资产和其他长期资产的损失 | 待摊费用减少 |
+| `incr_acc_exp` | 固定资产报废损失 | 待摊费用增加 |
+| `im_net_cashflow_oper_act` | 一年内到期的可转换公司债券 | 经营活动产生的现金流量净额(间接法) |
+| `conv_debt_into_cap` | 融资租入固定资产 | 债务转为资本 |
+| `conv_copbonds_due_within_1y` | 现金的期末余额 | 一年内到期的可转换公司债券 |
+| `fa_fnc_leases` | 现金的期初余额 | 融资租入固定资产 |
+| `im_n_incr_cash_equ` | 现金等价物的期末余额 | 现金及现金等价物净增加额(间接法) |
+| `net_dism_capital_add` | 现金等价物的期初余额 | 净减少资本 |
+| `net_cash_rece_sec` | 信用减值损失 | 收到的证券净额 |
+| `credit_impa_loss` | 使用权资产折旧 | 信用减值损失 |
+| `end_bal_cash` | 现金及现金等价物余额 | 现金的期末余额 |
+
+### 删除的字段
+
+- `use_right_assets_dep`: 此字段在 Tushare API 中不存在，已从映射中删除
+
+### 验证方法
+
+所有字段映射已通过以下方式验证：
+1. 直接调用 Tushare API 获取实际返回的字段
+2. 对比英文字段名和中文字段名的对应关系
+3. 确保 `field_mapping.py` 中的映射与 API 返回完全一致
+
+### 影响范围
+
+此修正影响：
+- `field_mapping.py` 中的 `CASHFLOW_FIELDS` 映射
+- 数据保存时的字段翻译
+- 数据查询和分析时的字段识别
