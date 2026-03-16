@@ -60,8 +60,14 @@ class CoreIndicatorsAnalyzer:
         income_filtered = self._filter_by_dates(income_statement, common_dates)
         cashflow_filtered = self._filter_by_dates(cashflow_statement, common_dates)
         
-        # 3. 计算TTM营业收入
+        # 3. 计算TTM营业收入、营业成本、经营现金流
         ttm_revenue = self._calculate_ttm_revenue(income_filtered)
+        
+        cost_col = '营业成本' if '营业成本' in income_filtered.columns else 'oper_cost'
+        ttm_cost = self._calculate_ttm_metric(income_filtered, cost_col)
+        
+        ocf_col = '经营活动产生的现金流量净额' if '经营活动产生的现金流量净额' in cashflow_filtered.columns else 'n_cashflow_act'
+        ttm_ocf = self._calculate_ttm_metric(cashflow_filtered, ocf_col)
         
         # 4. 计算各项指标
         results = []
@@ -73,7 +79,9 @@ class CoreIndicatorsAnalyzer:
                     balance_filtered,
                     income_filtered,
                     cashflow_filtered,
-                    ttm_revenue
+                    ttm_revenue,
+                    ttm_cost,
+                    ttm_ocf
                 )
                 
                 if indicators:
@@ -132,29 +140,36 @@ class CoreIndicatorsAnalyzer:
         date_col = self._get_date_column(df)
         return df[df[date_col].isin(dates)].copy()
     
-    def _calculate_ttm_revenue(self, income_statement: pd.DataFrame) -> Dict[str, float]:
+    def _calculate_ttm_metric(self, df: pd.DataFrame, metric_col: str) -> Dict[str, float]:
         """
-        计算TTM营业收入
+        计算TTM指标（通用方法）
         
         TTM = 今年Q累计 - 去年同Q累计 + 去年Q4累计
         
+        Args:
+            df: 财务报表数据
+            metric_col: 指标列名（如'营业收入'、'营业成本'、'经营活动产生的现金流量净额'）
+        
         Returns:
-            {报告期: TTM营业收入}
+            {报告期: TTM值}
         """
-        date_col = self._get_date_column(income_statement)
-        revenue_col = '营业收入' if '营业收入' in income_statement.columns else 'revenue'
+        date_col = self._get_date_column(df)
+        
+        # 检查列是否存在
+        if metric_col not in df.columns:
+            return {}
         
         # 按日期排序
-        df = income_statement.sort_values(date_col).copy()
+        df_sorted = df.sort_values(date_col).copy()
         
-        ttm_revenue = {}
+        ttm_values = {}
         
-        for idx, row in df.iterrows():
+        for idx, row in df_sorted.iterrows():
             current_date = row[date_col]
-            current_revenue = row[revenue_col]
+            current_value = row[metric_col]
             
             # 跳过空值
-            if pd.isna(current_revenue):
+            if pd.isna(current_value):
                 continue
             
             # 解析日期
@@ -164,37 +179,48 @@ class CoreIndicatorsAnalyzer:
             
             # 如果是Q4，直接使用累计值作为TTM
             if quarter == 4:
-                ttm_revenue[current_date] = current_revenue
+                ttm_values[current_date] = current_value
                 continue
             
             # 查找去年同期和去年Q4
             last_year = year - 1
-            last_year_same_q = f"{last_year}{str(current_date)[4:]}"
-            last_year_q4 = f"{last_year}1231"
+            current_date_str = str(int(current_date))
+            last_year_same_q = int(f"{last_year}{current_date_str[4:]}")
+            last_year_q4 = int(f"{last_year}1231")
             
             # 获取去年同期数据
-            last_year_same_q_data = df[df[date_col] == last_year_same_q]
-            last_year_q4_data = df[df[date_col] == last_year_q4]
+            last_year_same_q_data = df_sorted[df_sorted[date_col] == last_year_same_q]
+            last_year_q4_data = df_sorted[df_sorted[date_col] == last_year_q4]
             
             if len(last_year_q4_data) > 0:
-                last_year_q4_revenue = last_year_q4_data.iloc[0][revenue_col]
+                last_year_q4_value = last_year_q4_data.iloc[0][metric_col]
                 
-                if pd.notna(last_year_q4_revenue):
+                if pd.notna(last_year_q4_value):
                     # 计算TTM
                     if len(last_year_same_q_data) > 0:
-                        last_year_same_q_revenue = last_year_same_q_data.iloc[0][revenue_col]
-                        if pd.notna(last_year_same_q_revenue):
-                            ttm = current_revenue - last_year_same_q_revenue + last_year_q4_revenue
+                        last_year_same_q_value = last_year_same_q_data.iloc[0][metric_col]
+                        if pd.notna(last_year_same_q_value):
+                            ttm = current_value - last_year_same_q_value + last_year_q4_value
                         else:
                             # 如果去年同期为空，说明是Q1，直接用当期 + 去年Q4
-                            ttm = current_revenue + last_year_q4_revenue
+                            ttm = current_value + last_year_q4_value
                     else:
                         # Q1的情况
-                        ttm = current_revenue + last_year_q4_revenue
+                        ttm = current_value + last_year_q4_value
                     
-                    ttm_revenue[current_date] = ttm
+                    ttm_values[current_date] = ttm
         
-        return ttm_revenue
+        return ttm_values
+    
+    def _calculate_ttm_revenue(self, income_statement: pd.DataFrame) -> Dict[str, float]:
+        """
+        计算TTM营业收入
+        
+        Returns:
+            {报告期: TTM营业收入}
+        """
+        revenue_col = '营业收入' if '营业收入' in income_statement.columns else 'revenue'
+        return self._calculate_ttm_metric(income_statement, revenue_col)
     
     def _calculate_indicators_for_date(
         self,
@@ -202,7 +228,9 @@ class CoreIndicatorsAnalyzer:
         balance_sheet: pd.DataFrame,
         income_statement: pd.DataFrame,
         cashflow_statement: pd.DataFrame,
-        ttm_revenue: Dict[str, float]
+        ttm_revenue: Dict[str, float],
+        ttm_cost: Dict[str, float],
+        ttm_ocf: Dict[str, float]
     ) -> Optional[Dict]:
         """计算指定日期的所有指标"""
         
@@ -220,21 +248,22 @@ class CoreIndicatorsAnalyzer:
         income_current = income_current.iloc[0]
         cashflow_current = cashflow_current.iloc[0]
         
-        # 获取上期数据（用于计算平均值）
-        balance_last = self._get_last_period_data(balance_sheet, date)
+        # 获取去年同期数据（用于计算TTM指标的平均值）
+        balance_last_year = self._get_last_year_same_period_data(balance_sheet, date)
         
         # 初始化结果
         result = {'报告期': date}
         
         # 1. 计算应收账款周转率对数和毛利率
         indicator1 = self._calculate_indicator1(
-            balance_current, balance_last, income_current, ttm_revenue.get(date)
+            balance_current, balance_last_year, income_current, 
+            ttm_revenue.get(date), ttm_cost.get(date)
         )
         result.update(indicator1)
         
         # 2. 计算长期经营资产周转率对数
         indicator2 = self._calculate_indicator2(
-            balance_current, balance_last, ttm_revenue.get(date)
+            balance_current, balance_last_year, ttm_revenue.get(date)
         )
         result.update(indicator2)
         
@@ -243,7 +272,7 @@ class CoreIndicatorsAnalyzer:
         result.update(indicator3)
         
         # 4. 计算经营现金流比率
-        indicator4 = self._calculate_indicator4(balance_current, cashflow_current)
+        indicator4 = self._calculate_indicator4(balance_current, cashflow_current, ttm_ocf.get(date))
         result.update(indicator4)
         
         return result
@@ -253,7 +282,7 @@ class CoreIndicatorsAnalyzer:
         df: pd.DataFrame,
         current_date: str
     ) -> Optional[pd.Series]:
-        """获取上期数据"""
+        """获取上期数据（上一个季度）"""
         
         date_col = self._get_date_column(df)
         
@@ -279,6 +308,31 @@ class CoreIndicatorsAnalyzer:
         else:
             return None
     
+    def _get_last_year_same_period_data(
+        self,
+        df: pd.DataFrame,
+        current_date: str
+    ) -> Optional[pd.Series]:
+        """获取去年同期数据（用于计算TTM指标的平均值）"""
+        
+        date_col = self._get_date_column(df)
+        
+        # 解析当前日期
+        current_date_int = int(current_date)
+        year = current_date_int // 10000
+        month_day = current_date_int % 10000
+        
+        # 计算去年同期日期
+        last_year_date = (year - 1) * 10000 + month_day
+        
+        # 查找去年同期数据
+        last_year_data = df[df[date_col] == last_year_date]
+        
+        if len(last_year_data) > 0:
+            return last_year_data.iloc[0]
+        else:
+            return None
+    
     def _safe_get_value(self, row: pd.Series, *field_names) -> float:
         """安全获取字段值，尝试多个字段名"""
         for field in field_names:
@@ -291,25 +345,28 @@ class CoreIndicatorsAnalyzer:
     def _calculate_indicator1(
         self,
         balance_current: pd.Series,
-        balance_last: Optional[pd.Series],
+        balance_last_year: Optional[pd.Series],
         income_current: pd.Series,
-        ttm_revenue: Optional[float]
+        ttm_revenue: Optional[float],
+        ttm_cost: Optional[float]
     ) -> Dict:
         """
-        计算指标1：报表逻辑一致性检验暨回款周期
+        计算指标1：盈利能力与客户质量
         - 应收账款周转率对数
         - 毛利率
+        
+        注意：balance_last_year是去年同期数据，用于计算平均应收账款
         """
         result = {}
         
         # 获取应收账款
         ar_current = self._safe_get_value(balance_current, '应收账款', 'accounts_receiv')
         
-        # 计算平均应收账款
-        if balance_last is not None:
-            ar_last = self._safe_get_value(balance_last, '应收账款', 'accounts_receiv')
-            if pd.notna(ar_current) and pd.notna(ar_last):
-                avg_ar = (ar_current + ar_last) / 2
+        # 计算平均应收账款（使用去年同期的平均值，消除季节性波动）
+        if balance_last_year is not None:
+            ar_last_year = self._safe_get_value(balance_last_year, '应收账款', 'accounts_receiv')
+            if pd.notna(ar_current) and pd.notna(ar_last_year):
+                avg_ar = (ar_current + ar_last_year) / 2
             else:
                 avg_ar = ar_current
         else:
@@ -324,12 +381,9 @@ class CoreIndicatorsAnalyzer:
             result['应收账款周转率'] = np.nan
             result['应收账款周转率对数'] = np.nan
         
-        # 计算毛利率
-        revenue = self._safe_get_value(income_current, '营业收入', 'revenue')
-        cost = self._safe_get_value(income_current, '营业成本', 'oper_cost')
-        
-        if pd.notna(revenue) and pd.notna(cost) and revenue != 0:
-            gross_margin = (revenue - cost) / revenue * 100
+        # 计算毛利率（使用TTM数据）
+        if pd.notna(ttm_revenue) and pd.notna(ttm_cost) and ttm_revenue != 0:
+            gross_margin = (ttm_revenue - ttm_cost) / ttm_revenue * 100
             result['毛利率'] = gross_margin
         else:
             result['毛利率'] = np.nan
@@ -339,7 +393,7 @@ class CoreIndicatorsAnalyzer:
     def _calculate_indicator2(
         self,
         balance_current: pd.Series,
-        balance_last: Optional[pd.Series],
+        balance_last_year: Optional[pd.Series],
         ttm_revenue: Optional[float]
     ) -> Dict:
         """
@@ -349,6 +403,8 @@ class CoreIndicatorsAnalyzer:
         长期经营资产 = 固定资产 + 在建工程 + 生产性生物资产 + 公益性生物资产 
                     + 油气资产 + 使用权资产 + 无形资产 + 开发支出 
                     + 商誉 + 长期待摊费用 + 其他非流动资产
+        
+        注意：balance_last_year是去年同期数据，用于计算平均长期资产
         """
         result = {}
         
@@ -377,11 +433,11 @@ class CoreIndicatorsAnalyzer:
         
         lta_current = get_long_term_assets(balance_current)
         
-        # 计算平均长期经营资产
-        if balance_last is not None:
-            lta_last = get_long_term_assets(balance_last)
-            if pd.notna(lta_current) and pd.notna(lta_last):
-                avg_lta = (lta_current + lta_last) / 2
+        # 计算平均长期经营资产（使用去年同期的平均值，消除季节性波动）
+        if balance_last_year is not None:
+            lta_last_year = get_long_term_assets(balance_last_year)
+            if pd.notna(lta_current) and pd.notna(lta_last_year):
+                avg_lta = (lta_current + lta_last_year) / 2
             else:
                 avg_lta = lta_current
         else:
@@ -442,28 +498,22 @@ class CoreIndicatorsAnalyzer:
     def _calculate_indicator4(
         self,
         balance_current: pd.Series,
-        cashflow_current: pd.Series
+        cashflow_current: pd.Series,
+        ttm_ocf: Optional[float]
     ) -> Dict:
         """
         计算指标4：真实盈利水平暨现金流创造能力
-        - 经营现金流比率
+        - 经营现金流比率（使用TTM数据）
         """
         result = {}
-        
-        # 获取经营活动现金流量净额
-        ocf = self._safe_get_value(
-            cashflow_current,
-            '经营活动产生的现金流量净额',
-            'n_cashflow_act'
-        )
         
         # 获取资产总额
         total_assets = self._safe_get_value(balance_current, '资产总计', 'total_assets')
         
-        # 计算经营现金流比率
-        if pd.notna(ocf) and pd.notna(total_assets) and total_assets > 0:
-            ocf_ratio = ocf / total_assets * 100
-            result['经营活动现金流量净额'] = ocf
+        # 计算经营现金流比率（使用TTM数据）
+        if pd.notna(ttm_ocf) and pd.notna(total_assets) and total_assets > 0:
+            ocf_ratio = ttm_ocf / total_assets * 100
+            result['经营活动现金流量净额'] = ttm_ocf
             result['经营现金流比率'] = ocf_ratio
         else:
             result['经营活动现金流量净额'] = np.nan

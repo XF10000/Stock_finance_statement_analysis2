@@ -517,7 +517,9 @@ def main():
                 company_name_map = {
                     '000333.SZ': '美的集团',
                     '600900.SH': '长江电力',
-                    '603345.SH': '安井食品'
+                    '603345.SH': '安井食品',
+                    '601898.SH': '中煤能源',
+                    '601088.SH': '中国神华'
                 }
                 company_name = company_name_map.get(ts_code, ts_code.split('.')[0])
                 
@@ -536,8 +538,30 @@ def main():
             print(f"⚠️  生成HTML报告失败: {e}")
             import traceback
             traceback.print_exc()
+    
+    # 生成核心指标分析报告
+    print("\n" + "="*60)
+    print("生成核心指标分析报告...")
+    print("="*60)
+    
+    try:
+        from final_report_generator_echarts import FinalReportGenerator
         
-        print(f"\n完成！数据已保存到 {args.output_dir}")
+        core_generator = FinalReportGenerator()
+        
+        # 生成报告，使用新的文件名格式
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        core_report_path = f"data/{ts_code}_核心指标_{timestamp}.html"
+        core_generator.generate_report(ts_code, output_path=core_report_path)
+        
+        print(f"✓ 核心指标报告已生成")
+        print(f"  提示: 在浏览器中打开该文件即可查看交互式核心指标分析报告")
+    except Exception as e:
+        print(f"⚠️  生成核心指标报告失败: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    print(f"\n完成！数据已保存到 {args.output_dir}")
 
 
 if __name__ == '__main__':
