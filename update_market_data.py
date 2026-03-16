@@ -13,6 +13,7 @@ from datetime import datetime
 import yaml
 import os
 from queue import Queue
+import pandas as pd
 from tushare_client import TushareClient
 from market_data_manager import MarketDataManager
 
@@ -335,9 +336,130 @@ class MarketDataUpdater:
         
         self.logger.info("="*60 + "\n")
     
-    def update_latest_quarter(self):
-        """只更新最新季度的数据"""
-        self.logger.info("更新最新季度数据...")
+    def fetch_stock_incremental(self, ts_code: str, target_quarter: str = None) -> bool:
+        """
+        增量更新单只股票的最新季度数据
+        
+        Args:
+            ts_code: 股票代码
+            target_quarter: 目标季度（如20241231），不指定则自动判断
+            
+        Returns:
+            是否成功
+        """
+        try:
+            # 等待限流
+            self.rate_limiter.wait()
+            
+            # 初始化Tushare客户端
+            client = TushareClient(config_path=self.config_path)
+            
+            # 如果没有指定目标季度，自动判断最新季度
+            if not target_quarter:
+                now = datetime.now()
+                year = now.year
+                month = now.month
+                
+                # 判断当前应该是哪个季度
+                if month <= 4:
+                    # 1-4月，更新去年Q4数据
+                    target_quarter = f"{year-1}1231"
+                elif month <= 8:
+                    # 5-8月，更新今年Q1数据
+                    target_quarter = f"{year}0331"
+                elif month <= 10:
+                    # 9-10月，更新今年Q2数据
+                    target_quarter = f"{year}0630"
+                else:
+                    # 11-12月，更新今年Q3数据
+                    target_quarter = f"{year}0930"
+            
+            # 检查是否已有该季度数据
+            if self.db_manager.check_data_exists(ts_code, target_quarter, 'balancesheet'):
+                self.logger.debug(f"{ts_code} {target_quarter} 数据已存在，跳过")
+                with self.stats_lock:
+                    self.stats['skipped'] += 1
+                return True
+            
+            # 获取该季度的数据（前后各扩展30天）
+            start_date = str(int(target_quarter) - 100)  # 往前推一个月
+            end_date = str(int(target_quarter) + 100)    # 往后推一个月
+            
+            self.logger.info(f"获取 {ts_code} 的 {target_quarter} 季度数据...")
+            data = client.get_all_financial_data(
+                ts_code=ts_code,
+                start_date=start_date,
+                end_date=end_date,
+                translate=True
+            )
+            
+            if not data:
+                self.logger.warning(f"{ts_code} 未获取到数据")
+                with self.stats_lock:
+                    self.stats['failed'] += 1
+                    self.stats['failed_stocks'].append(ts_code)
+                return False
+            
+            # 保存数据
+            saved_count = 0
+            for table_name in ['balancesheet', 'income', 'cashflow', 'fina_indicator']:
+                if data.get(table_name) is not None and len(data[table_name]) > 0:
+                    df = data[table_name]
+                    
+                    # 找到日期列
+                    date_col = None
+                    for col in ['end_date', '报告期']:
+                        if col in df.columns:
+                            date_col = col
+                            break
+                    
+                    if date_col is None:
+                        continue
+                    
+                    # 只保存目标季度的数据
+                    df_filtered = df[df[date_col] == target_quarter]
+                    
+                    if len(df_filtered) > 0:
+                        try:
+                            self.db_manager.save_financial_data(
+                                ts_code=ts_code,
+                                end_date=target_quarter,
+                                data_type=table_name,
+                                data=df_filtered
+                            )
+                            saved_count += 1
+                        except Exception as e:
+                            self.logger.warning(f"保存 {ts_code} {table_name} {target_quarter} 失败: {e}")
+            
+            if saved_count > 0:
+                self.logger.info(f"✓ {ts_code} 成功保存 {saved_count} 条记录")
+                with self.stats_lock:
+                    self.stats['success'] += 1
+                return True
+            else:
+                with self.stats_lock:
+                    self.stats['skipped'] += 1
+                return True
+                
+        except Exception as e:
+            self.logger.error(f"增量更新 {ts_code} 失败: {e}")
+            with self.stats_lock:
+                self.stats['failed'] += 1
+                self.stats['failed_stocks'].append(ts_code)
+            return False
+    
+    def update_latest_quarter(self, target_quarter: str = None, 
+                             calculate_indicators: bool = True):
+        """
+        增量更新最新季度的数据
+        
+        Args:
+            target_quarter: 目标季度（如20241231），不指定则自动判断
+            calculate_indicators: 是否自动计算核心指标
+        """
+        self.logger.info("="*60)
+        self.logger.info("增量更新最新季度数据")
+        self.logger.info("="*60)
         
         # 获取所有股票
         stocks = self.db_manager.get_all_stocks()
@@ -346,11 +468,233 @@ class MarketDataUpdater:
             self.logger.error("数据库中没有股票列表，请先运行 --init")
             return
         
-        # TODO: 实现增量更新逻辑
-        # 1. 确定最新季度
-        # 2. 只更新该季度的数据
+        # 确定目标季度
+        if not target_quarter:
+            now = datetime.now()
+            year = now.year
+            month = now.month
+            
+            if month <= 4:
+                target_quarter = f"{year-1}1231"
+            elif month <= 8:
+                target_quarter = f"{year}0331"
+            elif month <= 10:
+                target_quarter = f"{year}0630"
+            else:
+                target_quarter = f"{year}0930"
         
-        self.logger.warning("增量更新功能待实现")
+        self.logger.info(f"目标季度: {target_quarter}")
+        self.logger.info(f"股票总数: {len(stocks)}")
+        
+        # 重置统计
+        self.stats = {
+            'total': len(stocks),
+            'success': 0,
+            'failed': 0,
+            'skipped': 0,
+            'start_time': time.time(),
+            'failed_stocks': []
+        }
+        
+        # 使用线程池更新
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = {
+                executor.submit(self.fetch_stock_incremental, stock['ts_code'], target_quarter): stock
+                for stock in stocks
+            }
+            
+            for i, future in enumerate(as_completed(futures), 1):
+                stock = futures[future]
+                try:
+                    future.result()
+                except Exception as e:
+                    self.logger.error(f"处理 {stock['ts_code']} 时发生异常: {e}")
+                
+                if i % 10 == 0 or i == len(stocks):
+                    self._print_progress(i, len(stocks))
+        
+        # 打印统计
+        self._print_final_stats()
+        
+        # 计算核心指标
+        if calculate_indicators and self.stats['success'] > 0:
+            self.logger.info("\n" + "="*60)
+            self.logger.info("开始计算核心指标...")
+            self.logger.info("="*60)
+            
+            self.calculate_core_indicators_batch(target_quarter)
+    
+    def calculate_core_indicators_batch(self, target_quarter: str = None, 
+                                       updated_stocks: List[str] = None):
+        """
+        批量计算核心指标（优化版：批量读取、内存计算、批量写入）
+        
+        Args:
+            target_quarter: 目标季度，不指定则计算所有有数据的季度
+            updated_stocks: 本次更新的股票列表，只计算这些股票的指标
+        """
+        from core_indicators_analyzer import CoreIndicatorsAnalyzer
+        import sqlite3
+        from tqdm import tqdm
+        
+        self.logger.info("使用优化算法批量计算核心指标...")
+        
+        conn = self.db_manager.get_connection()
+        
+        # 1. 确定需要计算的股票列表
+        if updated_stocks:
+            # 只计算本次更新的股票
+            stocks_to_calc = updated_stocks
+            self.logger.info(f"只计算本次更新的 {len(stocks_to_calc)} 只股票")
+        else:
+            # 计算所有股票
+            stocks_df = pd.read_sql_query('SELECT DISTINCT ts_code FROM stock_list', conn)
+            stocks_to_calc = stocks_df['ts_code'].tolist()
+            self.logger.info(f"计算所有 {len(stocks_to_calc)} 只股票")
+        
+        if len(stocks_to_calc) == 0:
+            self.logger.warning("没有需要计算的股票")
+            return
+        
+        # 2. 批量读取财务数据
+        self.logger.info("批量读取财务数据...")
+        
+        # 构建股票代码列表的SQL IN子句
+        stock_codes_str = "','".join(stocks_to_calc)
+        
+        if target_quarter:
+            # 只读取目标季度的数据
+            self.logger.info(f"只读取 {target_quarter} 季度的数据")
+            balance_all = pd.read_sql_query(
+                f"SELECT * FROM balancesheet WHERE ts_code IN ('{stock_codes_str}') AND end_date = '{target_quarter}'",
+                conn
+            )
+            income_all = pd.read_sql_query(
+                f"SELECT * FROM income WHERE ts_code IN ('{stock_codes_str}') AND end_date = '{target_quarter}'",
+                conn
+            )
+            cashflow_all = pd.read_sql_query(
+                f"SELECT * FROM cashflow WHERE ts_code IN ('{stock_codes_str}') AND end_date = '{target_quarter}'",
+                conn
+            )
+            
+            # 检查哪些股票已有该季度的核心指标
+            existing_indicators = pd.read_sql_query(
+                f"SELECT DISTINCT ts_code FROM core_indicators WHERE ts_code IN ('{stock_codes_str}') AND end_date = '{target_quarter}'",
+                conn
+            )
+            existing_stocks = set(existing_indicators['ts_code'].tolist())
+            
+            # 过滤掉已有指标的股票
+            stocks_to_calc = [s for s in stocks_to_calc if s not in existing_stocks]
+            
+            if len(existing_stocks) > 0:
+                self.logger.info(f"跳过已有指标的 {len(existing_stocks)} 只股票")
+            
+            if len(stocks_to_calc) == 0:
+                self.logger.info("所有股票的指标都已存在，无需计算")
+                return
+        else:
+            # 读取所有历史数据
+            balance_all = pd.read_sql_query(
+                f"SELECT * FROM balancesheet WHERE ts_code IN ('{stock_codes_str}')",
+                conn
+            )
+            income_all = pd.read_sql_query(
+                f"SELECT * FROM income WHERE ts_code IN ('{stock_codes_str}')",
+                conn
+            )
+            cashflow_all = pd.read_sql_query(
+                f"SELECT * FROM cashflow WHERE ts_code IN ('{stock_codes_str}')",
+                conn
+            )
+        
+        self.logger.info(f"读取完成: 资产负债表 {len(balance_all)} 条, 利润表 {len(income_all)} 条, 现金流量表 {len(cashflow_all)} 条")
+        
+        # 3. 批量计算指标
+        self.logger.info(f"开始计算 {len(stocks_to_calc)} 只股票的核心指标...")
+        
+        analyzer = CoreIndicatorsAnalyzer()
+        all_indicators = []
+        success_count = 0
+        failed_count = 0
+        
+        for ts_code in tqdm(stocks_to_calc, desc="计算进度"):
+            try:
+                # 筛选当前股票的数据
+                balance = balance_all[balance_all['ts_code'] == ts_code].copy()
+                income = income_all[income_all['ts_code'] == ts_code].copy()
+                cashflow = cashflow_all[cashflow_all['ts_code'] == ts_code].copy()
+                
+                if len(balance) == 0 or len(income) == 0 or len(cashflow) == 0:
+                    failed_count += 1
+                    continue
+                
+                # 计算指标
+                indicators = analyzer.calculate_all_indicators(balance, income, cashflow)
+                
+                if len(indicators) > 0:
+                    indicators['ts_code'] = ts_code
+                    all_indicators.append(indicators)
+                    success_count += 1
+                else:
+                    failed_count += 1
+                    
+            except Exception as e:
+                failed_count += 1
+                self.logger.debug(f"计算 {ts_code} 核心指标失败: {e}")
+        
+        # 4. 批量写入数据库
+        if len(all_indicators) > 0:
+            self.logger.info(f"批量写入 {len(all_indicators)} 只股票的指标数据...")
+            
+            indicators_df = pd.concat(all_indicators, ignore_index=True)
+            
+            # 准备批量插入数据
+            insert_data = []
+            for _, row in indicators_df.iterrows():
+                # 获取日期字段
+                end_date = row.get('end_date') or row.get('报告期')
+                if isinstance(end_date, str):
+                    end_date = end_date.replace('-', '')
+                
+                insert_data.append((
+                    row['ts_code'],
+                    str(end_date),
+                    row.get('ar_turnover_log') or row.get('应收账款周转率对数'),
+                    row.get('gross_margin') or row.get('毛利率'),
+                    row.get('lta_turnover_log') or row.get('长期经营资产周转率对数'),
+                    row.get('working_capital_ratio') or row.get('净营运资本比率'),
+                    row.get('ocf_ratio') or row.get('经营现金流比率'),
+                    None,  # percentiles稍后计算
+                    None,
+                    None,
+                    None,
+                    None,
+                    1,  # data_complete
+                    datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                ))
+            
+            # 批量插入
+            cursor = conn.cursor()
+            cursor.executemany('''
+                INSERT OR REPLACE INTO core_indicators (
+                    ts_code, end_date,
+                    ar_turnover_log, gross_margin, lta_turnover_log,
+                    working_capital_ratio, ocf_ratio,
+                    ar_turnover_log_percentile, gross_margin_percentile,
+                    lta_turnover_log_percentile, working_capital_ratio_percentile,
+                    ocf_ratio_percentile,
+                    data_complete, update_time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', insert_data)
+            
+            conn.commit()
+            self.logger.info("批量写入完成")
+        
+        self.logger.info("\n" + "="*60)
+        self.logger.info(f"核心指标计算完成: 成功 {success_count} 只，失败 {failed_count} 只")
+        self.logger.info("="*60)
 
 
 def main():
@@ -359,7 +703,13 @@ def main():
     parser.add_argument('--init', action='store_true', 
                        help='首次初始化（获取全部历史数据）')
     parser.add_argument('--update-latest', action='store_true',
-                       help='只更新最新季度数据')
+                       help='只更新最新季度数据（增量更新）')
+    parser.add_argument('--quarter', type=str,
+                       help='指定更新的季度（如20241231），不指定则自动判断')
+    parser.add_argument('--no-indicators', action='store_true',
+                       help='不自动计算核心指标')
+    parser.add_argument('--recalculate-all', action='store_true',
+                       help='强制重新计算所有股票的核心指标（忽略已有指标）')
     parser.add_argument('--force', action='store_true',
                        help='强制更新（忽略已有数据）')
     parser.add_argument('--resume', type=str,
@@ -418,10 +768,33 @@ def main():
     elif args.update_latest:
         # 更新最新季度
         logger.info("="*60)
-        logger.info("更新最新季度数据")
+        logger.info("增量更新最新季度数据")
         logger.info("="*60)
         
-        updater.update_latest_quarter()
+        updater.update_latest_quarter(
+            target_quarter=args.quarter,
+            calculate_indicators=not args.no_indicators
+        )
+        
+    elif args.recalculate_all:
+        # 强制重新计算所有核心指标
+        logger.info("="*60)
+        logger.info("强制重新计算所有股票的核心指标")
+        logger.info("="*60)
+        
+        # 清空现有指标
+        conn = updater.db_manager.get_connection()
+        cursor = conn.cursor()
+        logger.info("清空现有核心指标数据...")
+        cursor.execute('DELETE FROM core_indicators')
+        conn.commit()
+        logger.info("清空完成")
+        
+        # 重新计算所有指标
+        updater.calculate_core_indicators_batch(
+            target_quarter=args.quarter,
+            updated_stocks=None  # None表示计算所有股票
+        )
         
     else:
         parser.print_help()

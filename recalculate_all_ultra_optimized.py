@@ -29,15 +29,15 @@ def main():
     print("\n步骤2：批量读取所有财务数据...")
     
     print("  读取资产负债表...")
-    balance_all = pd.read_sql_query('SELECT * FROM balancesheet ORDER BY ts_code, 报告期', conn)
+    balance_all = pd.read_sql_query('SELECT * FROM balancesheet ORDER BY ts_code, end_date', conn)
     print(f"    {len(balance_all)} 条记录")
     
     print("  读取利润表...")
-    income_all = pd.read_sql_query('SELECT * FROM income ORDER BY ts_code, 报告期', conn)
+    income_all = pd.read_sql_query('SELECT * FROM income ORDER BY ts_code, end_date', conn)
     print(f"    {len(income_all)} 条记录")
     
     print("  读取现金流量表...")
-    cashflow_all = pd.read_sql_query('SELECT * FROM cashflow ORDER BY ts_code, 报告期', conn)
+    cashflow_all = pd.read_sql_query('SELECT * FROM cashflow ORDER BY ts_code, end_date', conn)
     print(f"    {len(cashflow_all)} 条记录")
     
     load_time = time.time() - start_time
@@ -111,36 +111,40 @@ def main():
     insert_data = []
     
     for _, row in indicators_df.iterrows():
+        # 获取日期字段（支持中英文）
+        end_date = row.get('end_date') or row.get('报告期')
+        if isinstance(end_date, str):
+            end_date = end_date.replace('-', '')
+        
         insert_data.append((
             row['ts_code'],
-            int(row['报告期']),
-            row.get('应收账款周转率'),
-            row.get('应收账款周转率对数'),
+            str(end_date),
+            row.get('ar_turnover_log') or row.get('应收账款周转率对数'),
+            row.get('gross_margin') or row.get('毛利率'),
+            row.get('lta_turnover_log') or row.get('长期经营资产周转率对数'),
+            row.get('working_capital_ratio') or row.get('净营运资本比率'),
+            row.get('ocf_ratio') or row.get('经营现金流比率'),
             None,  # ar_turnover_log_percentile 稍后计算
-            row.get('毛利率'),
             None,  # gross_margin_percentile
-            row.get('长期经营资产周转率'),
-            row.get('长期经营资产周转率对数'),
             None,  # lta_turnover_log_percentile
-            row.get('净营运资本比率'),
             None,  # working_capital_ratio_percentile
-            row.get('经营现金流比率'),
             None,  # ocf_ratio_percentile
+            1,  # data_complete
             datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         ))
     
     # 批量插入
     print(f"  批量插入 {len(insert_data)} 条记录...")
     cursor.executemany('''
-        INSERT INTO core_indicators (
+        INSERT OR REPLACE INTO core_indicators (
             ts_code, end_date,
-            ar_turnover, ar_turnover_log, ar_turnover_log_percentile,
-            gross_margin, gross_margin_percentile,
-            lta_turnover, lta_turnover_log, lta_turnover_log_percentile,
-            working_capital_ratio, working_capital_ratio_percentile,
-            ocf_ratio, ocf_ratio_percentile,
-            update_time
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ar_turnover_log, gross_margin, lta_turnover_log,
+            working_capital_ratio, ocf_ratio,
+            ar_turnover_log_percentile, gross_margin_percentile,
+            lta_turnover_log_percentile, working_capital_ratio_percentile,
+            ocf_ratio_percentile,
+            data_complete, update_time
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', insert_data)
     
     conn.commit()
