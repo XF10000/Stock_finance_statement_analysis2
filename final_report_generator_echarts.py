@@ -7,18 +7,18 @@ import pandas as pd
 import json
 from datetime import datetime
 import sqlite3
-from market_data_manager import MarketDataManager
+from financial_data_manager import FinancialDataManager
 from core_indicators_analyzer import CoreIndicatorsAnalyzer
-from market_analyzer import MarketAnalyzer
+from financial_data_analyzer import FinancialDataAnalyzer
 
 
 class FinalReportGenerator:
     """核心指标报告生成器（ECharts版本）"""
     
-    def __init__(self, db_path: str = 'database/market_data.db'):
-        self.db = MarketDataManager(db_path)
+    def __init__(self, db_path: str = 'database/financial_data.db'):
+        self.db = FinancialDataManager(db_path)
         self.analyzer = CoreIndicatorsAnalyzer()
-        self.market_analyzer = MarketAnalyzer(self.db)
+        self.market_analyzer = FinancialDataAnalyzer(self.db)
         
         # 指标配置
         self.indicators_config = [

@@ -1,0 +1,2 @@
+DEBUG    financial_data_manager:financial_data_manager.py:62 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:223 数据库初始化完成

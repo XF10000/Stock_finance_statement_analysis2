@@ -378,20 +378,20 @@ python init_database.py
 
 #### 6.2 增量更新数据库
 
-推荐使用 `update_market_data.py --update-latest`，系统会自动：
+推荐使用 `update_financial_data.py --update-latest`，系统会自动：
 - 识别需要更新的季度（或通过 `--quarter 20241231` 手动指定）
 - 跳过已有数据的股票，仅抓取缺失季度
 - 完成后自动批量计算核心指标（如无需可加 `--no-indicators`）
 
 ```bash
 # 自动判断当前应更新的季度
-python update_market_data.py --update-latest
+python update_financial_data.py --update-latest
 
 # 指定季度 + 关闭指标计算
-python update_market_data.py --update-latest --quarter 20241231 --no-indicators
+python update_financial_data.py --update-latest --quarter 20241231 --no-indicators
 
 # 使用备用数据库 + 自定义线程数
-python update_market_data.py --update-latest --db database/market_data_test.db --workers 10
+python update_financial_data.py --update-latest --db database/market_data_test.db --workers 10
 ```
 
 如需定时执行，可在 crontab / 任务计划中调用同一命令。
@@ -402,13 +402,13 @@ python update_market_data.py --update-latest --db database/market_data_test.db -
 
 ```bash
 # 首次初始化（自动跳过已有股票）
-python update_market_data.py --init
+python update_financial_data.py --init
 
 # 强制覆盖所有股票
-python update_market_data.py --init --force
+python update_financial_data.py --init --force
 
 # 断点续传
-python update_market_data.py --init --resume 600519.SH
+python update_financial_data.py --init --resume 600519.SH
 ```
 
 执行期间会自动限流，多次运行可增量补齐遗漏股票。注意 API 积分和耗时（数小时）。
@@ -419,10 +419,10 @@ python update_market_data.py --init --resume 600519.SH
 
 ```bash
 # 重算全部历史
-python update_market_data.py --recalculate-all
+python update_financial_data.py --recalculate-all
 
 # 仅重算指定季度，如2024Q4
-python update_market_data.py --recalculate-all --quarter 20241231
+python update_financial_data.py --recalculate-all --quarter 20241231
 ```
 
 该流程采用内存批量算法，约 10-20 分钟完成全A股重算。若只想针对最新更新的股票，可先增量更新，再运行 `--recalculate-all --quarter <目标季度>`。

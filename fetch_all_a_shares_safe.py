@@ -5,7 +5,7 @@
 import logging
 import os
 from datetime import datetime
-from update_market_data import MarketDataUpdater
+from update_financial_data import FinancialDataUpdater
 
 # 配置日志
 os.makedirs('logs', exist_ok=True)
@@ -57,9 +57,9 @@ def main():
     print("="*80)
     
     # 初始化更新器（单线程）
-    updater = MarketDataUpdater(
+    updater = FinancialDataUpdater(
         config_path='config.yaml',
-        db_path='database/market_data.db',
+        db_path='database/financial_data.db',
         max_workers=1  # 单线程
     )
     

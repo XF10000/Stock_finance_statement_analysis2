@@ -1,5 +1,5 @@
 """
-市场数据管理器
+财务数据管理器
 使用SQLite数据库管理全A股财务数据，支持多线程安全访问
 """
 
@@ -14,10 +14,10 @@ import os
 from io import StringIO
 
 
-class MarketDataManager:
-    """市场数据管理器 - 管理全A股财务数据的SQLite数据库"""
+class FinancialDataManager:
+    """财务数据管理器 - 管理全A股财务数据的SQLite数据库"""
     
-    def __init__(self, db_path: str = 'database/market_data.db'):
+    def __init__(self, db_path: str = 'database/financial_data.db'):
         """
         初始化数据库管理器
         
@@ -663,7 +663,7 @@ if __name__ == '__main__':
     )
     
     # 初始化数据库
-    db_manager = MarketDataManager('database/market_data_test.db')
+    db_manager = FinancialDataManager('database/financial_data_test.db')
     
     print("\n数据库初始化完成")
     

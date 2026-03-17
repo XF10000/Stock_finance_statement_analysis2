@@ -546,10 +546,10 @@ def main():
     
     try:
         from core_indicators_analyzer import CoreIndicatorsAnalyzer
-        from market_data_manager import MarketDataManager
+        from financial_data_manager import FinancialDataManager
         
         # 初始化数据库管理器
-        db_manager = MarketDataManager('database/market_data.db')
+        db_manager = FinancialDataManager('database/financial_data.db')
         analyzer = CoreIndicatorsAnalyzer()
         
         # 获取三大报表数据
@@ -607,9 +607,9 @@ def main():
                     # 只更新新季度的分位数排名
                     print("\n更新新季度的分位数排名...")
                     try:
-                        from market_analyzer import MarketAnalyzer
+                        from financial_data_analyzer import FinancialDataAnalyzer
                         
-                        analyzer_market = MarketAnalyzer(db_manager)
+                        analyzer_market = FinancialDataAnalyzer(db_manager)
                         
                         total_updated = 0
                         for end_date in new_quarters:

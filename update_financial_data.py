@@ -15,7 +15,7 @@ import os
 from queue import Queue
 import pandas as pd
 from tushare_client import TushareClient
-from market_data_manager import MarketDataManager
+from financial_data_manager import FinancialDataManager
 
 
 class RateLimiter:
@@ -54,11 +54,11 @@ class RateLimiter:
             self.calls.append(time.time())
 
 
-class MarketDataUpdater:
-    """全A股数据更新器"""
+class FinancialDataUpdater:
+    """全A股财务数据更新器"""
     
     def __init__(self, config_path: str = 'config.yaml', 
-                 db_path: str = 'database/market_data.db',
+                 db_path: str = 'database/financial_data.db',
                  max_workers: int = 5):
         """
         初始化更新器
@@ -76,7 +76,7 @@ class MarketDataUpdater:
         self.logger = logging.getLogger(__name__)
         
         # 初始化数据库管理器
-        self.db_manager = MarketDataManager(db_path)
+        self.db_manager = FinancialDataManager(db_path)
         
         # 初始化限流器（200次/分钟）
         self.rate_limiter = RateLimiter(max_calls=200, period=60)
@@ -718,7 +718,7 @@ def main():
                        help='工作线程数（默认5）')
     parser.add_argument('--config', type=str, default='config.yaml',
                        help='配置文件路径')
-    parser.add_argument('--db', type=str, default='database/market_data.db',
+    parser.add_argument('--db', type=str, default='database/financial_data.db',
                        help='数据库路径')
     parser.add_argument('--log-level', type=str, default='INFO',
                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
@@ -728,10 +728,10 @@ def main():
     
     # 配置日志
     logging.basicConfig(
-        level=getattr(logging, args.log_level),
+        level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler('update_market_data.log'),
+            logging.FileHandler('update_financial_data.log'),
             logging.StreamHandler()
         ]
     )
@@ -739,7 +739,7 @@ def main():
     logger = logging.getLogger(__name__)
     
     # 初始化更新器
-    updater = MarketDataUpdater(
+    updater = FinancialDataUpdater(
         config_path=args.config,
         db_path=args.db,
         max_workers=args.workers

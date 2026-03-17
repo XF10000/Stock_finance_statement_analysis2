@@ -14,7 +14,7 @@ def main():
     print("超级优化版：批量重新计算所有股票的核心指标")
     print("="*80)
     
-    db_path = 'database/market_data.db'
+    db_path = 'database/financial_data.db'
     conn = sqlite3.connect(db_path)
     
     start_time = time.time()

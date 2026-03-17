@@ -1,5 +1,5 @@
 """
-全A股市场分析器
+全A股财务数据分析器
 
 功能：
 1. 计算各指标在全A股中的分位数
@@ -13,13 +13,13 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple
 import logging
 from datetime import datetime
-from market_data_manager import MarketDataManager
+from financial_data_manager import FinancialDataManager
 
 
-class MarketAnalyzer:
-    """全A股市场分析器"""
+class FinancialDataAnalyzer:
+    """全A股财务数据分析器"""
     
-    def __init__(self, db_manager: MarketDataManager):
+    def __init__(self, db_manager: FinancialDataManager):
         """
         初始化分析器
         
