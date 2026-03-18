@@ -539,18 +539,17 @@ def main():
             import traceback
             traceback.print_exc()
     
-    # 计算并保存核心指标到数据库（仅更新新季度）
+    # 检查核心指标（不再自动计算和保存）
     print("\n" + "="*60)
-    print("检查并更新核心指标...")
+    print("检查核心指标...")
     print("="*60)
     
     try:
-        from core_indicators_analyzer import CoreIndicatorsAnalyzer
+        import pandas as pd
         from financial_data_manager import FinancialDataManager
         
         # 初始化数据库管理器
         db_manager = FinancialDataManager('database/financial_data.db')
-        analyzer = CoreIndicatorsAnalyzer()
         
         # 获取三大报表数据
         balance_data = data.get('balancesheet')
@@ -558,82 +557,73 @@ def main():
         cashflow_data = data.get('cashflow')
         
         if balance_data is not None and income_data is not None and cashflow_data is not None:
-            # 获取数据库中已有的核心指标季度
             conn = db_manager.get_connection()
-            existing_quarters_query = '''
+            
+            # 1. 检查年报核心指标
+            existing_annual_query = '''
                 SELECT DISTINCT end_date 
                 FROM core_indicators 
-                WHERE ts_code = ? AND ar_turnover_log IS NOT NULL
+                WHERE ts_code = ? AND ar_turnover_log IS NOT NULL AND is_ttm = 0
             '''
-            existing_df = pd.read_sql_query(existing_quarters_query, conn, params=(ts_code,))
-            existing_quarters = set(existing_df['end_date'].tolist()) if len(existing_df) > 0 else set()
+            existing_annual_df = pd.read_sql_query(existing_annual_query, conn, params=(ts_code,))
+            existing_annual = set(existing_annual_df['end_date'].tolist()) if len(existing_annual_df) > 0 else set()
             
-            # 计算所有核心指标
-            indicators_df = analyzer.calculate_all_indicators(balance_data, income_data, cashflow_data)
+            # 获取数据库中有财务数据的所有年报季度
+            db_annual_query = '''
+                SELECT DISTINCT b.end_date 
+                FROM balancesheet b
+                INNER JOIN income i ON b.ts_code = i.ts_code AND b.end_date = i.end_date
+                INNER JOIN cashflow c ON b.ts_code = c.ts_code AND b.end_date = c.end_date
+                WHERE b.ts_code = ? AND b.end_date LIKE '%1231'
+            '''
+            db_annual_df = pd.read_sql_query(db_annual_query, conn, params=(ts_code,))
+            all_annual = set(db_annual_df['end_date'].tolist()) if len(db_annual_df) > 0 else set()
             
-            if len(indicators_df) > 0:
-                # 筛选出需要更新的季度（数据库中不存在或为空的）
-                date_col = 'end_date' if 'end_date' in indicators_df.columns else '报告期'
-                new_quarters = []
-                
-                for _, row in indicators_df.iterrows():
-                    end_date = row.get('end_date') or row.get('报告期')
-                    if isinstance(end_date, str):
-                        end_date = end_date.replace('-', '')
-                    
-                    # 只保存数据库中不存在的季度
-                    if str(end_date) not in existing_quarters:
-                        new_quarters.append(end_date)
-                        
-                        indicators_dict = {
-                            'ar_turnover_log': row.get('ar_turnover_log') or row.get('应收账款周转率对数'),
-                            'gross_margin': row.get('gross_margin') or row.get('毛利率'),
-                            'lta_turnover_log': row.get('lta_turnover_log') or row.get('长期经营资产周转率对数'),
-                            'working_capital_ratio': row.get('working_capital_ratio') or row.get('净营运资本比率'),
-                            'ocf_ratio': row.get('ocf_ratio') or row.get('经营现金流比率'),
-                        }
-                        
-                        db_manager.save_core_indicators(
-                            ts_code=ts_code,
-                            end_date=str(end_date),
-                            indicators=indicators_dict,
-                            data_complete=1
-                        )
-                
-                if len(new_quarters) > 0:
-                    print(f"✓ 新增 {len(new_quarters)} 个季度的核心指标")
-                    print(f"  跳过已有 {len(existing_quarters)} 个季度")
-                    
-                    # 只更新新季度的分位数排名
-                    print("\n更新新季度的分位数排名...")
-                    try:
-                        from financial_data_analyzer import FinancialDataAnalyzer
-                        
-                        analyzer_market = FinancialDataAnalyzer(db_manager)
-                        
-                        total_updated = 0
-                        for end_date in new_quarters:
-                            # 转换日期格式
-                            if isinstance(end_date, str):
-                                end_date = end_date.replace('-', '')
-                            
-                            # 只更新该季度的分位数（只影响该季度的所有股票）
-                            count = analyzer_market.update_percentile_ranks(str(end_date))
-                            total_updated += count
-                        
-                        print(f"✓ 分位数排名已更新，共 {total_updated} 条记录")
-                    except Exception as e:
-                        print(f"⚠️  更新分位数失败: {e}")
-                        import traceback
-                        traceback.print_exc()
-                else:
-                    print(f"✓ 数据库已有全部 {len(existing_quarters)} 个季度的核心指标，无需更新")
+            missing_annual = all_annual - existing_annual
+            
+            if len(missing_annual) == 0:
+                print(f"✓ 年报核心指标: 已有全部 {len(existing_annual)} 个年报的核心指标")
             else:
-                print("⚠️  未能计算出核心指标")
+                print(f"⚠️  年报核心指标: 发现 {len(missing_annual)} 个年报缺少核心指标")
+                print(f"   已有: {len(existing_annual)} 个年报")
+                print(f"   缺失: {sorted(list(missing_annual))[:5]}{'...' if len(missing_annual) > 5 else ''}")
+            
+            # 2. 检查 TTM 指标
+            # 获取最新季度
+            date_col = '报告期' if '报告期' in balance_data.columns else 'end_date'
+            latest_quarter = sorted([str(q).replace('-', '') for q in balance_data[date_col].unique()])[-1]
+            
+            # 判断最新季度是否为年报
+            is_annual = latest_quarter.endswith('1231')
+            
+            if not is_annual:
+                # 非年报季度，检查是否有 TTM 指标
+                ttm_query = '''
+                    SELECT end_date, ar_turnover_log, gross_margin
+                    FROM core_indicators
+                    WHERE ts_code = ? AND end_date = ? AND is_ttm = 1
+                '''
+                ttm_df = pd.read_sql_query(ttm_query, conn, params=(ts_code, latest_quarter))
+                
+                if len(ttm_df) > 0:
+                    print(f"✓ TTM 指标: 最新季度 {latest_quarter} 已有 TTM 核心指标")
+                else:
+                    print(f"⚠️  TTM 指标: 最新季度 {latest_quarter} 缺少 TTM 核心指标")
+                    print(f"\n💡 建议运行以下命令生成 TTM 指标:")
+                    print(f"   python3 backfill_ttm_indicators.py --stocks {ts_code}")
+            else:
+                print(f"✓ 最新季度 {latest_quarter} 为年报，无需 TTM 指标")
+            
+            # 3. 如果有缺失，给出建议
+            if len(missing_annual) > 0:
+                print(f"\n💡 建议运行以下命令更新核心指标:")
+                print(f"   python3 update_financial_data.py --update-latest")
+                print(f"   或")
+                print(f"   python3 recalc_single_stock.py {ts_code.split('.')[0]}")
         else:
-            print("⚠️  缺少必要的财务数据，无法计算核心指标")
+            print("⚠️  缺少必要的财务数据，无法检查核心指标")
     except Exception as e:
-        print(f"⚠️  计算核心指标失败: {e}")
+        print(f"⚠️  检查核心指标失败: {e}")
         import traceback
         traceback.print_exc()
     

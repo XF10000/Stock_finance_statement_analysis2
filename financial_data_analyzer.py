@@ -145,108 +145,76 @@ class FinancialDataAnalyzer:
     def update_percentile_ranks(
         self,
         end_date: str,
-        market_stats: Optional[Dict[str, Dict]] = None
+        market_stats: Optional[Dict[str, Dict]] = None,
+        is_ttm: bool = False
     ) -> int:
         """
-        更新指定报告期所有股票的分位数排名
+        更新指定报告期所有股票的分位数排名（批量优化版）
         
         Args:
             end_date: 报告期
-            market_stats: 市场统计数据（如果为None则重新计算）
+            market_stats: 市场统计数据（已废弃，保留参数以兼容旧代码）
+            is_ttm: 是否更新 TTM 指标的分位数
             
         Returns:
             更新的股票数量
         """
-        self.logger.info(f"更新 {end_date} 的分位数排名...")
-        
-        # 如果没有提供市场统计数据，则重新计算
-        if market_stats is None:
-            market_stats = self.calculate_market_percentiles(end_date)
-        
-        if not market_stats:
-            self.logger.warning("没有市场统计数据，无法更新排名")
-            return 0
+        ttm_label = "TTM " if is_ttm else ""
+        self.logger.info(f"更新 {end_date} 的{ttm_label}分位数排名...")
         
         # 获取所有股票的指标数据
         conn = self.db.get_connection()
         cursor = conn.cursor()
         
         query = '''
-            SELECT ts_code, ar_turnover_log, gross_margin, lta_turnover_log,
+            SELECT id, ts_code, ar_turnover_log, gross_margin, lta_turnover_log,
                    working_capital_ratio, ocf_ratio
             FROM core_indicators
-            WHERE end_date = ?
+            WHERE end_date = ? AND is_ttm = ?
         '''
         
-        df = pd.read_sql_query(query, conn, params=(end_date,))
+        df = pd.read_sql_query(query, conn, params=(end_date, 1 if is_ttm else 0))
         
         if len(df) == 0:
             return 0
         
-        # 计算每只股票的分位数排名
-        updated_count = 0
+        # 批量计算分位数（使用 pandas rank 函数）
+        indicator_cols = ['ar_turnover_log', 'gross_margin', 'lta_turnover_log',
+                         'working_capital_ratio', 'ocf_ratio']
         
+        # 为每个指标计算分位数
+        for col in indicator_cols:
+            # 使用 rank(pct=True) 计算百分位数
+            df[f'{col}_percentile'] = df[col].rank(pct=True) * 100
+        
+        # 批量更新数据库
+        update_data = []
         for _, row in df.iterrows():
-            ts_code = row['ts_code']
-            percentiles = {}
-            
-            # 计算各指标的分位数
-            for col_name in self.indicator_columns.keys():
-                if col_name not in market_stats:
-                    percentiles[f'{col_name}_percentile'] = None
-                    continue
-                
-                value = row[col_name]
-                
-                if pd.isna(value):
-                    percentiles[f'{col_name}_percentile'] = None
-                    continue
-                
-                # 获取该指标的所有有效值
-                all_values_query = f'''
-                    SELECT {col_name}
-                    FROM core_indicators
-                    WHERE end_date = ? AND {col_name} IS NOT NULL
-                '''
-                
-                all_values = pd.read_sql_query(
-                    all_values_query, conn, params=(end_date,)
-                )[col_name]
-                
-                # 计算分位数（小于等于该值的比例）
-                percentile = (all_values <= value).sum() / len(all_values) * 100
-                percentiles[f'{col_name}_percentile'] = float(percentile)
-            
-            # 更新数据库
-            try:
-                cursor.execute('''
-                    UPDATE core_indicators
-                    SET ar_turnover_log_percentile = ?,
-                        gross_margin_percentile = ?,
-                        lta_turnover_log_percentile = ?,
-                        working_capital_ratio_percentile = ?,
-                        ocf_ratio_percentile = ?,
-                        update_time = ?
-                    WHERE ts_code = ? AND end_date = ?
-                ''', (
-                    percentiles.get('ar_turnover_log_percentile'),
-                    percentiles.get('gross_margin_percentile'),
-                    percentiles.get('lta_turnover_log_percentile'),
-                    percentiles.get('working_capital_ratio_percentile'),
-                    percentiles.get('ocf_ratio_percentile'),
-                    datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    ts_code,
-                    end_date
-                ))
-                
-                updated_count += 1
-                
-            except Exception as e:
-                self.logger.error(f"更新 {ts_code} 的分位数失败: {str(e)}")
-                continue
+            update_data.append((
+                row['ar_turnover_log_percentile'],
+                row['gross_margin_percentile'],
+                row['lta_turnover_log_percentile'],
+                row['working_capital_ratio_percentile'],
+                row['ocf_ratio_percentile'],
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                row['id']
+            ))
+        
+        # 批量更新
+        cursor.executemany('''
+            UPDATE core_indicators
+            SET ar_turnover_log_percentile = ?,
+                gross_margin_percentile = ?,
+                lta_turnover_log_percentile = ?,
+                working_capital_ratio_percentile = ?,
+                ocf_ratio_percentile = ?,
+                update_time = ?
+            WHERE id = ?
+        ''', update_data)
         
         conn.commit()
         
+        updated_count = len(update_data)
         self.logger.info(f"成功更新 {updated_count} 只股票的分位数排名")
         
         return updated_count

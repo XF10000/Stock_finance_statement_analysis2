@@ -411,6 +411,61 @@ class FinancialDataManager:
         else:
             return pd.DataFrame()
     
+    def get_financial_data_batch_optimized(self, ts_codes: List[str], 
+                                          data_type: str,
+                                          end_date: str = None) -> pd.DataFrame:
+        """
+        批量读取并解析财务数据（优化版：一次SQL查询 + 批量解析JSON）
+        
+        Args:
+            ts_codes: 股票代码列表
+            data_type: 数据类型 (balancesheet/income/cashflow/fina_indicator)
+            end_date: 可选，只读取指定季度
+            
+        Returns:
+            解析后的DataFrame，包含所有股票的数据
+        """
+        if data_type not in ['balancesheet', 'income', 'cashflow', 'fina_indicator']:
+            raise ValueError(f"不支持的数据类型: {data_type}")
+        
+        if len(ts_codes) == 0:
+            return pd.DataFrame()
+        
+        conn = self.get_connection()
+        
+        # 构建SQL查询
+        codes_str = "','".join(ts_codes)
+        if end_date:
+            query = f"SELECT ts_code, end_date, data_json FROM {data_type} WHERE ts_code IN ('{codes_str}') AND end_date = '{end_date}'"
+        else:
+            query = f"SELECT ts_code, end_date, data_json FROM {data_type} WHERE ts_code IN ('{codes_str}')"
+        
+        # 批量读取（显示进度）
+        self.logger.info(f"  正在读取 {data_type} 数据...")
+        raw_data = pd.read_sql_query(query, conn)
+        self.logger.info(f"  ✓ 读取完成，共 {len(raw_data)} 条记录")
+        
+        if len(raw_data) == 0:
+            return pd.DataFrame()
+        
+        # 批量解析JSON
+        self.logger.info(f"  正在解析 JSON 数据...")
+        parsed_data = []
+        for _, row in raw_data.iterrows():
+            try:
+                data_array = json.loads(row['data_json'])
+                if isinstance(data_array, list) and len(data_array) > 0:
+                    parsed_data.append(data_array[0])
+            except Exception as e:
+                self.logger.warning(f"解析 {row['ts_code']} {row['end_date']} 失败: {e}")
+                continue
+        
+        self.logger.info(f"  ✓ 解析完成，共 {len(parsed_data)} 条有效数据")
+        
+        if len(parsed_data) > 0:
+            return pd.DataFrame(parsed_data)
+        return pd.DataFrame()
+    
     def check_data_exists(self, ts_code: str, end_date: str, data_type: str) -> bool:
         """
         检查数据是否已存在

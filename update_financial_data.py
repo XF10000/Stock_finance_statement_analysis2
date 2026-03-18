@@ -565,17 +565,14 @@ class FinancialDataUpdater:
         if target_quarter:
             # 只读取目标季度的数据
             self.logger.info(f"只读取 {target_quarter} 季度的数据")
-            balance_all = pd.read_sql_query(
-                f"SELECT * FROM balancesheet WHERE ts_code IN ('{stock_codes_str}') AND end_date = '{target_quarter}'",
-                conn
+            balance_all = self.db_manager.get_financial_data_batch_optimized(
+                stocks_to_calc, 'balancesheet', target_quarter
             )
-            income_all = pd.read_sql_query(
-                f"SELECT * FROM income WHERE ts_code IN ('{stock_codes_str}') AND end_date = '{target_quarter}'",
-                conn
+            income_all = self.db_manager.get_financial_data_batch_optimized(
+                stocks_to_calc, 'income', target_quarter
             )
-            cashflow_all = pd.read_sql_query(
-                f"SELECT * FROM cashflow WHERE ts_code IN ('{stock_codes_str}') AND end_date = '{target_quarter}'",
-                conn
+            cashflow_all = self.db_manager.get_financial_data_batch_optimized(
+                stocks_to_calc, 'cashflow', target_quarter
             )
             
             # 检查哪些股票已有该季度的核心指标
@@ -596,20 +593,25 @@ class FinancialDataUpdater:
                 return
         else:
             # 读取所有历史数据
-            balance_all = pd.read_sql_query(
-                f"SELECT * FROM balancesheet WHERE ts_code IN ('{stock_codes_str}')",
-                conn
+            balance_all = self.db_manager.get_financial_data_batch_optimized(
+                stocks_to_calc, 'balancesheet'
             )
-            income_all = pd.read_sql_query(
-                f"SELECT * FROM income WHERE ts_code IN ('{stock_codes_str}')",
-                conn
+            income_all = self.db_manager.get_financial_data_batch_optimized(
+                stocks_to_calc, 'income'
             )
-            cashflow_all = pd.read_sql_query(
-                f"SELECT * FROM cashflow WHERE ts_code IN ('{stock_codes_str}')",
-                conn
+            cashflow_all = self.db_manager.get_financial_data_batch_optimized(
+                stocks_to_calc, 'cashflow'
             )
         
         self.logger.info(f"读取完成: 资产负债表 {len(balance_all)} 条, 利润表 {len(income_all)} 条, 现金流量表 {len(cashflow_all)} 条")
+        
+        # 处理列名不一致问题（资产负债表和现金流量表用'TS股票代码'，利润表用'TS代码'）
+        if len(balance_all) > 0 and 'TS股票代码' in balance_all.columns:
+            balance_all = balance_all.rename(columns={'TS股票代码': 'ts_code'})
+        if len(income_all) > 0 and 'TS代码' in income_all.columns:
+            income_all = income_all.rename(columns={'TS代码': 'ts_code'})
+        if len(cashflow_all) > 0 and 'TS股票代码' in cashflow_all.columns:
+            cashflow_all = cashflow_all.rename(columns={'TS股票代码': 'ts_code'})
         
         # 3. 批量计算指标
         self.logger.info(f"开始计算 {len(stocks_to_calc)} 只股票的核心指标...")
@@ -691,9 +693,223 @@ class FinancialDataUpdater:
             
             conn.commit()
             self.logger.info("批量写入完成")
+            
+            # 自动更新分位数
+            self.logger.info("\n自动更新分位数排名...")
+            try:
+                from financial_data_analyzer import FinancialDataAnalyzer
+                analyzer_market = FinancialDataAnalyzer(self.db_manager)
+                
+                # 获取需要更新的季度
+                quarters = set()
+                for _, row in indicators_df.iterrows():
+                    end_date = row.get('end_date') or row.get('报告期')
+                    if isinstance(end_date, str):
+                        end_date = end_date.replace('-', '')
+                    quarters.add(str(int(end_date)))
+                
+                total_updated = 0
+                for quarter in quarters:
+                    count = analyzer_market.update_percentile_ranks(quarter)
+                    total_updated += count
+                
+                self.logger.info(f"✓ 已更新 {len(quarters)} 个季度的分位数，共 {total_updated} 条记录")
+            except Exception as e:
+                self.logger.warning(f"⚠️  更新分位数失败: {e}")
         
         self.logger.info("\n" + "="*60)
         self.logger.info(f"核心指标计算完成: 成功 {success_count} 只，失败 {failed_count} 只")
+        self.logger.info("="*60)
+    
+    def calculate_ttm_indicators_batch(self, updated_stocks: List[str] = None):
+        """
+        批量计算 TTM 核心指标
+        为每个季度（Q1/Q2/Q3/Q4）生成 TTM 指标并存储到数据库
+        
+        Args:
+            updated_stocks: 本次更新的股票列表，只计算这些股票的指标
+        """
+        from core_indicators_analyzer import CoreIndicatorsAnalyzer
+        from ttm_generator import TTMGenerator
+        from tqdm import tqdm
+        
+        self.logger.info("="*60)
+        self.logger.info("批量计算 TTM 核心指标...")
+        self.logger.info("="*60)
+        
+        conn = self.db_manager.get_connection()
+        
+        # 1. 确定需要计算的股票列表
+        if updated_stocks:
+            stocks_to_calc = updated_stocks
+            self.logger.info(f"只计算本次更新的 {len(stocks_to_calc)} 只股票")
+        else:
+            stocks_df = pd.read_sql_query('SELECT DISTINCT ts_code FROM stock_list', conn)
+            stocks_to_calc = stocks_df['ts_code'].tolist()
+            self.logger.info(f"计算所有 {len(stocks_to_calc)} 只股票")
+        
+        if len(stocks_to_calc) == 0:
+            self.logger.warning("没有需要计算的股票")
+            return
+        
+        # 2. 批量读取财务数据
+        self.logger.info("批量读取财务数据...")
+        balance_all = self.db_manager.get_financial_data_batch_optimized(
+            stocks_to_calc, 'balancesheet'
+        )
+        income_all = self.db_manager.get_financial_data_batch_optimized(
+            stocks_to_calc, 'income'
+        )
+        cashflow_all = self.db_manager.get_financial_data_batch_optimized(
+            stocks_to_calc, 'cashflow'
+        )
+        
+        # 列名统一化
+        if len(balance_all) > 0 and 'TS股票代码' in balance_all.columns:
+            balance_all = balance_all.rename(columns={'TS股票代码': 'ts_code'})
+        if len(income_all) > 0 and 'TS代码' in income_all.columns:
+            income_all = income_all.rename(columns={'TS代码': 'ts_code'})
+        if len(cashflow_all) > 0 and 'TS股票代码' in cashflow_all.columns:
+            cashflow_all = cashflow_all.rename(columns={'TS股票代码': 'ts_code'})
+        
+        self.logger.info(f"读取完成: 资产负债表 {len(balance_all)} 条, 利润表 {len(income_all)} 条, 现金流量表 {len(cashflow_all)} 条")
+        
+        # 3. 批量计算 TTM 指标
+        self.logger.info(f"开始计算 {len(stocks_to_calc)} 只股票的 TTM 核心指标...")
+        
+        generator = TTMGenerator()
+        analyzer = CoreIndicatorsAnalyzer()
+        all_indicators = []
+        success_count = 0
+        failed_count = 0
+        
+        for ts_code in tqdm(stocks_to_calc, desc="TTM 计算进度"):
+            try:
+                # 筛选当前股票的数据
+                balance = balance_all[balance_all['ts_code'] == ts_code].copy()
+                income = income_all[income_all['ts_code'] == ts_code].copy()
+                cashflow = cashflow_all[cashflow_all['ts_code'] == ts_code].copy()
+                
+                if len(balance) == 0 or len(income) == 0 or len(cashflow) == 0:
+                    failed_count += 1
+                    continue
+                
+                # 获取所有季度
+                date_col = '报告期' if '报告期' in balance.columns else 'end_date'
+                all_quarters = sorted([str(q).replace('-', '') for q in balance[date_col].unique()])
+                
+                # 为每个季度生成 TTM 指标
+                for quarter in all_quarters:
+                    try:
+                        # 生成 TTM 财务数据
+                        ttm_data = generator.generate_ttm_data(
+                            balance, income, cashflow, quarter
+                        )
+                        
+                        if not ttm_data:
+                            continue
+                        
+                        # 计算 TTM 核心指标（数据已经是 TTM 格式）
+                        indicators = analyzer.calculate_all_indicators(
+                            ttm_data['balance'],
+                            ttm_data['income'],
+                            ttm_data['cashflow'],
+                            is_ttm_data=True
+                        )
+                        
+                        if len(indicators) > 0:
+                            indicators['ts_code'] = ts_code
+                            indicators['end_date'] = quarter
+                            indicators['is_ttm'] = 1
+                            all_indicators.append(indicators)
+                    
+                    except Exception as e:
+                        self.logger.debug(f"计算 {ts_code} {quarter} TTM 指标失败: {e}")
+                        continue
+                
+                if len([ind for ind in all_indicators if ind['ts_code'].iloc[0] == ts_code]) > 0:
+                    success_count += 1
+                else:
+                    failed_count += 1
+                    
+            except Exception as e:
+                failed_count += 1
+                self.logger.debug(f"处理 {ts_code} 失败: {e}")
+        
+        # 4. 批量写入数据库
+        if len(all_indicators) > 0:
+            self.logger.info(f"批量写入 {len(all_indicators)} 条 TTM 指标数据...")
+            
+            indicators_df = pd.concat(all_indicators, ignore_index=True)
+            
+            # 准备批量插入数据
+            insert_data = []
+            for _, row in indicators_df.iterrows():
+                end_date = row.get('end_date')
+                if isinstance(end_date, str):
+                    end_date = end_date.replace('-', '')
+                
+                insert_data.append((
+                    row['ts_code'],
+                    str(end_date),
+                    row.get('ar_turnover_log') or row.get('应收账款周转率对数'),
+                    row.get('gross_margin') or row.get('毛利率'),
+                    row.get('lta_turnover_log') or row.get('长期经营资产周转率对数'),
+                    row.get('working_capital_ratio') or row.get('净营运资本比率'),
+                    row.get('ocf_ratio') or row.get('经营现金流比率'),
+                    None,  # percentiles稍后计算
+                    None,
+                    None,
+                    None,
+                    None,
+                    1,  # data_complete
+                    1,  # is_ttm
+                    datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                ))
+            
+            # 批量插入
+            cursor = conn.cursor()
+            cursor.executemany('''
+                INSERT OR REPLACE INTO core_indicators (
+                    ts_code, end_date,
+                    ar_turnover_log, gross_margin, lta_turnover_log,
+                    working_capital_ratio, ocf_ratio,
+                    ar_turnover_log_percentile, gross_margin_percentile,
+                    lta_turnover_log_percentile, working_capital_ratio_percentile,
+                    ocf_ratio_percentile,
+                    data_complete, is_ttm, update_time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', insert_data)
+            
+            conn.commit()
+            self.logger.info("批量写入完成")
+            
+            # 自动更新分位数
+            self.logger.info("\n自动更新 TTM 分位数排名...")
+            try:
+                from financial_data_analyzer import FinancialDataAnalyzer
+                analyzer_market = FinancialDataAnalyzer(self.db_manager)
+                
+                # 获取需要更新的季度
+                quarters = set()
+                for _, row in indicators_df.iterrows():
+                    end_date = row.get('end_date')
+                    if isinstance(end_date, str):
+                        end_date = end_date.replace('-', '')
+                    quarters.add(str(int(end_date)))
+                
+                total_updated = 0
+                for quarter in quarters:
+                    # 更新 TTM 分位数（is_ttm=1）
+                    count = analyzer_market.update_percentile_ranks(quarter, is_ttm=True)
+                    total_updated += count
+                
+                self.logger.info(f"✓ 已更新 {len(quarters)} 个季度的 TTM 分位数，共 {total_updated} 条记录")
+            except Exception as e:
+                self.logger.warning(f"⚠️  更新 TTM 分位数失败: {e}")
+        
+        self.logger.info("\n" + "="*60)
+        self.logger.info(f"TTM 核心指标计算完成: 成功 {success_count} 只，失败 {failed_count} 只")
         self.logger.info("="*60)
 
 
@@ -777,9 +993,9 @@ def main():
         )
         
     elif args.recalculate_all:
-        # 强制重新计算所有核心指标
+        # 强制重新计算所有核心指标（年报 + TTM）
         logger.info("="*60)
-        logger.info("强制重新计算所有股票的核心指标")
+        logger.info("强制重新计算所有股票的核心指标（年报 + TTM）")
         logger.info("="*60)
         
         # 清空现有指标
@@ -788,13 +1004,233 @@ def main():
         logger.info("清空现有核心指标数据...")
         cursor.execute('DELETE FROM core_indicators')
         conn.commit()
-        logger.info("清空完成")
+        logger.info("清空完成\n")
         
-        # 重新计算所有指标
-        updater.calculate_core_indicators_batch(
-            target_quarter=args.quarter,
-            updated_stocks=None  # None表示计算所有股票
+        # 一次性读取所有数据，分别计算年报和 TTM 指标
+        from core_indicators_analyzer import CoreIndicatorsAnalyzer
+        from ttm_generator import TTMGenerator
+        from tqdm import tqdm
+        
+        # 1. 获取股票列表
+        stocks_df = pd.read_sql_query('SELECT DISTINCT ts_code FROM stock_list', conn)
+        stocks_to_calc = stocks_df['ts_code'].tolist()
+        logger.info(f"计算所有 {len(stocks_to_calc)} 只股票\n")
+        
+        # 2. 批量读取财务数据（只读取一次）
+        logger.info("批量读取财务数据...")
+        balance_all = updater.db_manager.get_financial_data_batch_optimized(
+            stocks_to_calc, 'balancesheet'
         )
+        income_all = updater.db_manager.get_financial_data_batch_optimized(
+            stocks_to_calc, 'income'
+        )
+        cashflow_all = updater.db_manager.get_financial_data_batch_optimized(
+            stocks_to_calc, 'cashflow'
+        )
+        
+        # 列名统一化
+        if len(balance_all) > 0 and 'TS股票代码' in balance_all.columns:
+            balance_all = balance_all.rename(columns={'TS股票代码': 'ts_code'})
+        if len(income_all) > 0 and 'TS代码' in income_all.columns:
+            income_all = income_all.rename(columns={'TS代码': 'ts_code'})
+        if len(cashflow_all) > 0 and 'TS股票代码' in cashflow_all.columns:
+            cashflow_all = cashflow_all.rename(columns={'TS股票代码': 'ts_code'})
+        
+        logger.info(f"数据读取完成\n")
+        
+        # 3. 计算年报和 TTM 指标
+        logger.info("开始计算核心指标（年报 + TTM）...")
+        
+        analyzer = CoreIndicatorsAnalyzer()
+        generator = TTMGenerator()
+        all_annual_indicators = []
+        all_ttm_indicators = []
+        success_count = 0
+        failed_count = 0
+        
+        for ts_code in tqdm(stocks_to_calc, desc="计算进度"):
+            try:
+                # 筛选当前股票的数据
+                balance = balance_all[balance_all['ts_code'] == ts_code].copy()
+                income = income_all[income_all['ts_code'] == ts_code].copy()
+                cashflow = cashflow_all[cashflow_all['ts_code'] == ts_code].copy()
+                
+                if len(balance) == 0 or len(income) == 0 or len(cashflow) == 0:
+                    failed_count += 1
+                    continue
+                
+                # 计算年报指标
+                annual_indicators = analyzer.calculate_all_indicators(balance, income, cashflow)
+                if len(annual_indicators) > 0:
+                    annual_indicators['ts_code'] = ts_code
+                    annual_indicators['is_ttm'] = 0
+                    all_annual_indicators.append(annual_indicators)
+                
+                # 计算 TTM 指标
+                date_col = '报告期' if '报告期' in balance.columns else 'end_date'
+                all_quarters = sorted([str(q).replace('-', '') for q in balance[date_col].unique()])
+                
+                ttm_count = 0
+                for quarter in all_quarters:
+                    try:
+                        ttm_data = generator.generate_ttm_data(balance, income, cashflow, quarter)
+                        if not ttm_data:
+                            continue
+                        
+                        ttm_indicators = analyzer.calculate_all_indicators(
+                            ttm_data['balance'],
+                            ttm_data['income'],
+                            ttm_data['cashflow'],
+                            is_ttm_data=True
+                        )
+                        
+                        if len(ttm_indicators) > 0:
+                            ttm_indicators['ts_code'] = ts_code
+                            ttm_indicators['end_date'] = quarter
+                            ttm_indicators['is_ttm'] = 1
+                            all_ttm_indicators.append(ttm_indicators)
+                            ttm_count += 1
+                    except Exception as e:
+                        logger.warning(f"计算 {ts_code} {quarter} TTM 指标失败: {e}")
+                        continue
+                
+                if ttm_count > 0:
+                    logger.debug(f"{ts_code}: 成功计算 {ttm_count} 个季度的 TTM 指标")
+                
+                success_count += 1
+                    
+            except Exception as e:
+                failed_count += 1
+                logger.debug(f"处理 {ts_code} 失败: {e}")
+        
+        # 4. 批量写入年报指标
+        if len(all_annual_indicators) > 0:
+            logger.info(f"\n批量写入年报指标数据...")
+            indicators_df = pd.concat(all_annual_indicators, ignore_index=True)
+            
+            # 只保留年报季度（12月31日）的记录
+            date_col = 'end_date' if 'end_date' in indicators_df.columns else '报告期'
+            indicators_df['_end_date_str'] = indicators_df[date_col].astype(str).str.replace('-', '')
+            indicators_df = indicators_df[indicators_df['_end_date_str'].str.endswith('1231')]
+            logger.info(f"  过滤后保留 {len(indicators_df)} 条年报记录")
+            
+            insert_data = []
+            for _, row in indicators_df.iterrows():
+                end_date = row.get('end_date') or row.get('报告期')
+                if isinstance(end_date, str):
+                    end_date = end_date.replace('-', '')
+                
+                insert_data.append((
+                    row['ts_code'],
+                    str(end_date),
+                    row.get('ar_turnover_log') or row.get('应收账款周转率对数'),
+                    row.get('gross_margin') or row.get('毛利率'),
+                    row.get('lta_turnover_log') or row.get('长期经营资产周转率对数'),
+                    row.get('working_capital_ratio') or row.get('净营运资本比率'),
+                    row.get('ocf_ratio') or row.get('经营现金流比率'),
+                    None, None, None, None, None,
+                    1,  # data_complete
+                    0,  # is_ttm
+                    datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                ))
+            
+            cursor.executemany('''
+                INSERT OR REPLACE INTO core_indicators (
+                    ts_code, end_date,
+                    ar_turnover_log, gross_margin, lta_turnover_log,
+                    working_capital_ratio, ocf_ratio,
+                    ar_turnover_log_percentile, gross_margin_percentile,
+                    lta_turnover_log_percentile, working_capital_ratio_percentile,
+                    ocf_ratio_percentile,
+                    data_complete, is_ttm, update_time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', insert_data)
+            conn.commit()
+            logger.info(f"✓ 年报指标写入完成")
+        
+        # 5. 批量写入 TTM 指标
+        logger.info(f"\n收集到 {len(all_ttm_indicators)} 只股票的 TTM 指标")
+        if len(all_ttm_indicators) > 0:
+            logger.info(f"批量写入 TTM 指标数据...")
+            indicators_df = pd.concat(all_ttm_indicators, ignore_index=True)
+            logger.info(f"  合并后共 {len(indicators_df)} 条 TTM 记录")
+            
+            insert_data = []
+            for _, row in indicators_df.iterrows():
+                end_date = row.get('end_date')
+                if isinstance(end_date, str):
+                    end_date = end_date.replace('-', '')
+                
+                insert_data.append((
+                    row['ts_code'],
+                    str(end_date),
+                    row.get('ar_turnover_log') or row.get('应收账款周转率对数'),
+                    row.get('gross_margin') or row.get('毛利率'),
+                    row.get('lta_turnover_log') or row.get('长期经营资产周转率对数'),
+                    row.get('working_capital_ratio') or row.get('净营运资本比率'),
+                    row.get('ocf_ratio') or row.get('经营现金流比率'),
+                    None, None, None, None, None,
+                    1,  # data_complete
+                    1,  # is_ttm
+                    datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                ))
+            
+            cursor.executemany('''
+                INSERT OR REPLACE INTO core_indicators (
+                    ts_code, end_date,
+                    ar_turnover_log, gross_margin, lta_turnover_log,
+                    working_capital_ratio, ocf_ratio,
+                    ar_turnover_log_percentile, gross_margin_percentile,
+                    lta_turnover_log_percentile, working_capital_ratio_percentile,
+                    ocf_ratio_percentile,
+                    data_complete, is_ttm, update_time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', insert_data)
+            conn.commit()
+            logger.info(f"✓ TTM 指标写入完成")
+        
+        # 6. 更新分位数
+        logger.info("\n更新分位数排名...")
+        try:
+            from financial_data_analyzer import FinancialDataAnalyzer
+            analyzer_market = FinancialDataAnalyzer(updater.db_manager)
+            
+            # 获取所有季度
+            all_quarters = set()
+            if len(all_annual_indicators) > 0:
+                for _, row in pd.concat(all_annual_indicators, ignore_index=True).iterrows():
+                    end_date = row.get('end_date') or row.get('报告期')
+                    if isinstance(end_date, str):
+                        end_date = end_date.replace('-', '')
+                    all_quarters.add(str(int(end_date)))
+            
+            if len(all_ttm_indicators) > 0:
+                for _, row in pd.concat(all_ttm_indicators, ignore_index=True).iterrows():
+                    end_date = row.get('end_date')
+                    if isinstance(end_date, str):
+                        end_date = end_date.replace('-', '')
+                    all_quarters.add(str(int(end_date)))
+            
+            # 更新年报分位数
+            total_updated = 0
+            for quarter in all_quarters:
+                count = analyzer_market.update_percentile_ranks(quarter, is_ttm=False)
+                total_updated += count
+            
+            # 更新 TTM 分位数
+            for quarter in all_quarters:
+                count = analyzer_market.update_percentile_ranks(quarter, is_ttm=True)
+                total_updated += count
+            
+            logger.info(f"✓ 已更新 {len(all_quarters)} 个季度的分位数，共 {total_updated} 条记录")
+        except Exception as e:
+            logger.warning(f"⚠️  更新分位数失败: {e}")
+        
+        logger.info("\n" + "="*60)
+        logger.info(f"所有核心指标计算完成: 成功 {success_count} 只，失败 {failed_count} 只")
+        logger.info(f"  年报指标: {len(all_annual_indicators)} 条")
+        logger.info(f"  TTM 指标: {len(all_ttm_indicators)} 条")
+        logger.info("="*60)
         
     else:
         parser.print_help()

@@ -31,7 +31,8 @@ class CoreIndicatorsAnalyzer:
         self,
         balance_sheet: pd.DataFrame,
         income_statement: pd.DataFrame,
-        cashflow_statement: pd.DataFrame
+        cashflow_statement: pd.DataFrame,
+        is_ttm_data: bool = False
     ) -> pd.DataFrame:
         """
         计算所有核心指标
@@ -40,6 +41,7 @@ class CoreIndicatorsAnalyzer:
             balance_sheet: 资产负债表数据
             income_statement: 利润表数据
             cashflow_statement: 现金流量表数据
+            is_ttm_data: 数据是否已经是 TTM 格式（如果是，直接使用当期值而不再计算 TTM）
             
         Returns:
             包含所有指标的DataFrame
@@ -61,13 +63,25 @@ class CoreIndicatorsAnalyzer:
         cashflow_filtered = self._filter_by_dates(cashflow_statement, common_dates)
         
         # 3. 计算TTM营业收入、营业成本、经营现金流
-        ttm_revenue = self._calculate_ttm_revenue(income_filtered)
-        
-        cost_col = '营业成本' if '营业成本' in income_filtered.columns else 'oper_cost'
-        ttm_cost = self._calculate_ttm_metric(income_filtered, cost_col)
-        
-        ocf_col = '经营活动产生的现金流量净额' if '经营活动产生的现金流量净额' in cashflow_filtered.columns else 'n_cashflow_act'
-        ttm_ocf = self._calculate_ttm_metric(cashflow_filtered, ocf_col)
+        if is_ttm_data:
+            # 数据已经是 TTM 格式，直接使用当期值
+            revenue_col = '营业收入' if '营业收入' in income_filtered.columns else 'revenue'
+            ttm_revenue = self._use_current_values(income_filtered, revenue_col)
+            
+            cost_col = '营业成本' if '营业成本' in income_filtered.columns else 'oper_cost'
+            ttm_cost = self._use_current_values(income_filtered, cost_col)
+            
+            ocf_col = '经营活动产生的现金流量净额' if '经营活动产生的现金流量净额' in cashflow_filtered.columns else 'n_cashflow_act'
+            ttm_ocf = self._use_current_values(cashflow_filtered, ocf_col)
+        else:
+            # 原有逻辑：计算 TTM
+            ttm_revenue = self._calculate_ttm_revenue(income_filtered)
+            
+            cost_col = '营业成本' if '营业成本' in income_filtered.columns else 'oper_cost'
+            ttm_cost = self._calculate_ttm_metric(income_filtered, cost_col)
+            
+            ocf_col = '经营活动产生的现金流量净额' if '经营活动产生的现金流量净额' in cashflow_filtered.columns else 'n_cashflow_act'
+            ttm_ocf = self._calculate_ttm_metric(cashflow_filtered, ocf_col)
         
         # 4. 计算各项指标
         results = []
@@ -211,6 +225,32 @@ class CoreIndicatorsAnalyzer:
                     ttm_values[current_date] = ttm
         
         return ttm_values
+    
+    def _use_current_values(self, data: pd.DataFrame, metric_col: str) -> Dict[str, float]:
+        """
+        直接使用当期值作为 TTM 值（用于已经是 TTM 格式的数据）
+        
+        Args:
+            data: 财务数据
+            metric_col: 指标列名
+            
+        Returns:
+            {报告期: 当期值}
+        """
+        date_col = self._get_date_column(data)
+        current_values = {}
+        
+        for _, row in data.iterrows():
+            date = row[date_col]
+            if isinstance(date, str):
+                date = date.replace('-', '')
+            date = str(int(date))
+            
+            value = row.get(metric_col)
+            if pd.notna(value):
+                current_values[date] = value
+        
+        return current_values
     
     def _calculate_ttm_revenue(self, income_statement: pd.DataFrame) -> Dict[str, float]:
         """
