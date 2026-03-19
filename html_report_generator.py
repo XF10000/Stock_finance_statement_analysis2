@@ -177,14 +177,15 @@ class HTMLReportGenerator:
             'type': 'bar_line',
             'data': self._extract_chart_data(df, date_columns, {
                 'bar': ['营业收入', '营业成本', '毛利', '净利润'],
-                'line': ['毛利率']
+                'line': ['毛利率', '净利润率']
             }),
             'colors': {
                 '营业收入': self.COLORS['blue'],
                 '营业成本': self.COLORS['gray'],
                 '毛利': self.COLORS['green'],
                 '净利润': self.COLORS['yellow'],
-                '毛利率': self.COLORS['red']
+                '毛利率': self.COLORS['red'],
+                '净利润率': self.COLORS['orange']
             },
             'y_axis_names': ['亿元', ''],
             'line_format': 'percent'
@@ -2091,21 +2092,15 @@ class HTMLReportGenerator:
             elif 'end_date' not in df.columns:
                 return [None] * len(date_columns)
             
-            # 确保有分红金额列
-            if '每股派息(税后)' in df.columns:
-                df['cash_div_tax'] = df['每股派息(税后)']
-            if '每股派息(税前)' in df.columns:
-                df['cash_div'] = df['每股派息(税前)']
-            
             # 转换日期格式
             df['end_date'] = df['end_date'].astype(str)
             df['year'] = df['end_date'].str[:4]
             df['month'] = df['end_date'].str[4:6]
             
-            # 优先使用cash_div_tax，其次cash_div
+            # 优先使用税后派息，其次税前派息（直接使用中文列名）
             df['dividend'] = df.apply(
-                lambda row: row.get('cash_div_tax', 0) if pd.notna(row.get('cash_div_tax')) and row.get('cash_div_tax', 0) > 0 
-                else (row.get('cash_div', 0) if pd.notna(row.get('cash_div')) else 0), 
+                lambda row: row.get('每股派息(税后)', 0) if pd.notna(row.get('每股派息(税后)')) and row.get('每股派息(税后)', 0) > 0 
+                else (row.get('每股派息(税前)', 0) if pd.notna(row.get('每股派息(税前)')) else 0), 
                 axis=1
             )
             
@@ -2137,7 +2132,10 @@ class HTMLReportGenerator:
             
             if os.path.exists(balance_file):
                 balance_df = pd.read_csv(balance_file, encoding='utf-8-sig')
-                total_share_row = balance_df[balance_df['项目'] == '总股本']
+                # 确保列名是字符串类型
+                balance_df.columns = [str(col) for col in balance_df.columns]
+                
+                total_share_row = balance_df[balance_df['项目'] == '期末总股本']
                 
                 if len(total_share_row) > 0:
                     for col in date_columns:
