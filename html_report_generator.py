@@ -557,29 +557,21 @@ class HTMLReportGenerator:
             else:
                 营业外收支净额率_data.append(None)
             
-            # 5. 总费用率 = 税金及附加率 + 销售费用率 + 管理费用率 + 经营资产减值损失率 + 营业外收支净额率
+            # 5. 总费用率 = 税金及附加率 + 销售费用率 + 管理费用率 + 经营资产减值损失率 - 营业外收支净额率
+            # 注意：营业外收支净额率是减去的，不是加上
             total = 0
-            count = 0
             if 税金及附加率_data[i] is not None:
                 total += 税金及附加率_data[i]
-                count += 1
             if 销售费用率 and i < len(销售费用率) and 销售费用率[i] is not None:
                 total += 销售费用率[i]
-                count += 1
             if 管理费用率 and i < len(管理费用率) and 管理费用率[i] is not None:
                 total += 管理费用率[i]
-                count += 1
-            if 研发费用率 and i < len(研发费用率) and 研发费用率[i] is not None:
-                total += 研发费用率[i]
-                count += 1
             if 经营资产减值损失率_data[i] is not None:
                 total += 经营资产减值损失率_data[i]
-                count += 1
             if 营业外收支净额率_data[i] is not None:
-                total += 营业外收支净额率_data[i]
-                count += 1
+                total -= 营业外收支净额率_data[i]  # 减去营业外收支净额率
             
-            总费用率_data.append(total if count > 0 else None)
+            总费用率_data.append(total)
         
         # 添加计算字段到series
         series['税金及附加率'] = {'type': 'line', 'data': 税金及附加率_data}
