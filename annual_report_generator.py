@@ -132,6 +132,10 @@ class AnnualReportGenerator:
         
         self.logger.info("生成资产负债表年报+TTM数据...")
         
+        # 确保所有列名都是字符串类型（避免整数列名导致的匹配失败）
+        df = df.copy()
+        df.columns = [str(col) for col in df.columns]
+        
         # 构建输出的列顺序
         output_columns = ['项目']
         
@@ -205,6 +209,10 @@ class AnnualReportGenerator:
             return pd.DataFrame()
         
         self.logger.info("生成利润表年报+TTM数据...")
+        
+        # 确保所有列名都是字符串类型
+        df = df.copy()
+        df.columns = [str(col) for col in df.columns]
         
         # 构建输出的列顺序
         output_columns = ['项目']
@@ -281,6 +289,10 @@ class AnnualReportGenerator:
             return pd.DataFrame()
         
         self.logger.info("生成现金流量表年报+TTM数据...")
+        
+        # 确保所有列名都是字符串类型
+        df = df.copy()
+        df.columns = [str(col) for col in df.columns]
         
         # 构建输出的列顺序
         output_columns = ['项目']
