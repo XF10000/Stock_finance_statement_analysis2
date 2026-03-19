@@ -398,7 +398,50 @@ class AnnualReportGenerator:
         df_result = df_result.reset_index()
         df_result.columns = output_columns
         
+        # 重新计算TTM的比率类指标（如果有TTM列）
+        if latest_quarter != 4:
+            self._recalculate_cashflow_ratios(df_result, ttm_label)
+        
         return df_result
+    
+    def _recalculate_cashflow_ratios(self, df: pd.DataFrame, ttm_col: str):
+        """
+        重新计算现金流量表中的比率类指标
+        
+        比率类指标不能用TTM公式（加减法）计算，必须用对应的分子/分母重新计算
+        """
+        def get_value(item_name):
+            row = df[df['项目'] == item_name]
+            if len(row) > 0 and ttm_col in df.columns:
+                val = row[ttm_col].values[0]
+                return val if pd.notna(val) else 0
+            return 0
+        
+        def set_value(item_name, value):
+            df.loc[df['项目'] == item_name, ttm_col] = value
+        
+        # 获取基础数据
+        销售收到现金 = get_value('销售商品、提供劳务收到的现金')
+        营业收入 = get_value('营业收入')
+        购买支付现金 = get_value('购买商品、接收劳务支付的现金')
+        职工支付现金 = get_value('支付给职工及为职工支付的现金')
+        营业总成本 = get_value('营业总成本')
+        经营现金流 = get_value('经营活动产生的现金流量净额')
+        息前税后经营利润 = get_value('息前税后经营利润')
+        净利润 = get_value('净利润')
+        
+        # 重新计算比率
+        if 营业收入 != 0:
+            set_value('口径一收入现金含量', 销售收到现金 / 营业收入)
+        
+        if 营业总成本 != 0:
+            set_value('成本费用付现率', (购买支付现金 / 1.17 + 职工支付现金) / 营业总成本)
+        
+        if 息前税后经营利润 != 0:
+            set_value('息前税后经营利润现金含量', 经营现金流 / 息前税后经营利润)
+        
+        if 净利润 != 0:
+            set_value('净利润现金含量', 经营现金流 / 净利润)
     
     def _calculate_ttm(
         self,
