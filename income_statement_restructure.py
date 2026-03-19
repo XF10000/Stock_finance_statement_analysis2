@@ -285,8 +285,8 @@ def restructure_income_statement(df: pd.DataFrame,
     
     # 长期股权投资收益（通常适用不同税率）
     invest_income = _safe_get_value(df_data, '投资收益', date_columns)
-    joint_invest_income = _safe_get_value(df_data, '对联营企业投资收益', date_columns)
-    long_term_equity_income = joint_invest_income  # 对联营企业投资收益视为长期股权投资收益
+    joint_invest_income = _safe_get_value(df_data, '对联营企业和合营企业的投资收益', date_columns)
+    long_term_equity_income = joint_invest_income  # 对联营企业和合营企业的投资收益视为长期股权投资收益
     
     # 计算实际所得税税率
     # 实际所得税税率 = 所得税费用 / (税前利润 - 长期股权投资收益)
