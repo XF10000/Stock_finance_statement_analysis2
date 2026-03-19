@@ -366,6 +366,10 @@ def restructure_cashflow_statement(
     longterm_operating_assets_begin = pd.Series(0.0, index=date_columns)
     
     if balance_data is not None and '项目' in balance_data.columns:
+        # 确保资产负债表的列名都是字符串类型（避免整数列名导致的匹配失败）
+        balance_data = balance_data.copy()
+        balance_data.columns = [str(col) for col in balance_data.columns]
+        
         asset_row = balance_data[balance_data['项目'] == '长期经营资产合计']
         if len(asset_row) > 0:
             # 按日期升序排列（从旧到新）
