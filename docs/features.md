@@ -58,18 +58,25 @@ python update_financial_data.py --update-stock 000001 --full
 
 ### 4. 分红数据更新
 ```bash
+# 更新所有股票的分红数据
 python update_financial_data.py --update-dividend
+
+# 更新单只股票的分红数据
+python update_financial_data.py --update-stock-dividend 000333
 ```
 **功能**：
 - 智能季度判断：根据每只股票财务数据最新季度获取分红
 - 只更新缺失的分红数据
 - 避免重复获取
+- 支持单只股票快速更新（新增）
 
 **示例**：
 - 如果某股票财务数据最新到2025Q3 → 获取2025Q3及以前的分红
 - 如果某股票财务数据最新到2025Q4 → 获取2025Q4及以前的分红
 
-**适用场景**：补充或更新分红数据
+**适用场景**：
+- 批量更新：补充或更新所有股票分红数据
+- 单只更新：快速更新某只股票的分红数据
 
 ---
 

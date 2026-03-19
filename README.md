@@ -189,7 +189,11 @@ python update_financial_data.py --update-stock 000001 --full
 
 #### 更新分红数据
 ```bash
+# 更新所有股票的分红数据
 python update_financial_data.py --update-dividend
+
+# 更新单只股票的分红数据（新增）
+python update_financial_data.py --update-stock-dividend 000333
 ```
 **智能优化**：根据每只股票财务数据最新季度获取分红
 

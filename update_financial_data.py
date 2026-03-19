@@ -258,7 +258,7 @@ class FinancialDataUpdater:
                 WHERE ts_code = '{ts_code}'
             """
             result = pd.read_sql_query(query, conn)
-            conn.close()
+            # 不关闭连接，让连接池管理
             
             if not result.empty and not pd.isna(result['latest_date'].iloc[0]):
                 end_date = str(result['latest_date'].iloc[0])
@@ -271,23 +271,27 @@ class FinancialDataUpdater:
                 # 等待限流
                 self.rate_limiter.wait()
                 
-                # 获取分红数据（如果有end_date则只获取该季度及以前的）
-                if end_date:
-                    df = client.pro.dividend(
-                        ts_code=ts_code,
-                        end_date=end_date,  # 只获取该季度及以前的分红
-                        fields='end_date,ann_date,div_proc,stk_div,stk_bo_rate,stk_co_rate,cash_div,cash_div_tax,record_date,ex_date,pay_date,div_listdate,imp_ann_date'
-                    )
-                else:
-                    # 如果没有财务数据，获取所有分红数据
-                    df = client.pro.dividend(
-                        ts_code=ts_code,
-                        fields='end_date,ann_date,div_proc,stk_div,stk_bo_rate,stk_co_rate,cash_div,cash_div_tax,record_date,ex_date,pay_date,div_listdate,imp_ann_date'
-                    )
+                # 获取所有分红数据
+                df = client.pro.dividend(
+                    ts_code=ts_code,
+                    fields='end_date,ann_date,div_proc,stk_div,stk_bo_rate,stk_co_rate,cash_div,cash_div_tax,record_date,ex_date,pay_date,div_listdate,imp_ann_date'
+                )
                 
                 if df is None or len(df) == 0:
                     self.logger.debug(f"{ts_code} 未获取到分红数据")
                     return None
+                
+                # 如果有财务数据的最新季度，则只保留该季度及以前的分红数据
+                if end_date:
+                    original_count = len(df)
+                    df = df[df['end_date'] <= end_date]
+                    filtered_count = len(df)
+                    if filtered_count < original_count:
+                        self.logger.debug(f"{ts_code} 根据财务数据最新季度 {end_date} 筛选分红: {original_count} → {filtered_count} 条")
+                    
+                    if len(df) == 0:
+                        self.logger.debug(f"{ts_code} 筛选后无分红数据")
+                        return None
                 
                 # 按报告期排序
                 df = df.sort_values('end_date', ascending=False)
@@ -1447,6 +1451,9 @@ def main():
   # 更新单只股票的完整历史数据
   python update_financial_data.py --update-stock 000001 --full
   
+  # 更新单只股票的分红数据
+  python update_financial_data.py --update-stock-dividend 000001
+  
   # 更新所有股票的分红数据（补充缺失数据）
   python update_financial_data.py --update-dividend
   
@@ -1468,6 +1475,8 @@ def main():
                        help='增量更新：只更新最新季度的财务四表数据和核心指标（不包括分红）')
     parser.add_argument('--update-stock', type=str, metavar='CODE',
                        help='更新单只股票（例如：000001 或 600519.SH），默认增量更新最新季度，配合 --full 可更新全部历史数据')
+    parser.add_argument('--update-stock-dividend', type=str, metavar='CODE',
+                       help='更新单只股票的分红数据（例如：000001 或 600519.SH）')
     parser.add_argument('--update-dividend', action='store_true',
                        help='更新所有股票的分红数据（补充缺失数据，不重复获取已有数据）')
     parser.add_argument('--recalculate-all', action='store_true',
@@ -1520,6 +1529,11 @@ def main():
         args.update_stock = normalize_stock_code(args.update_stock)
         logger.info(f"更新股票代码规范化为: {args.update_stock}")
     
+    # 规范化 update_stock_dividend 参数（如果有）
+    if args.update_stock_dividend:
+        args.update_stock_dividend = normalize_stock_code(args.update_stock_dividend)
+        logger.info(f"更新分红股票代码规范化为: {args.update_stock_dividend}")
+    
     # 初始化更新器
     updater = FinancialDataUpdater(
         config_path=args.config,
@@ -1527,7 +1541,33 @@ def main():
         max_workers=args.workers
     )
     
-    if args.update_stock:
+    if args.update_stock_dividend:
+        # 更新单只股票的分红数据
+        logger.info("="*60)
+        logger.info(f"更新单只股票的分红数据: {args.update_stock_dividend}")
+        logger.info("="*60)
+        
+        try:
+            # 初始化Tushare客户端
+            client = TushareClient(config_path=args.config)
+            
+            # 获取分红数据
+            logger.info(f"正在获取 {args.update_stock_dividend} 的分红数据...")
+            dividend_df = updater.fetch_dividend_data(client, args.update_stock_dividend)
+            
+            if dividend_df is not None and len(dividend_df) > 0:
+                # 保存到数据库
+                updater.db_manager.save_dividend_data(args.update_stock_dividend, dividend_df)
+                logger.info(f"✓ {args.update_stock_dividend} 分红数据更新成功，共 {len(dividend_df)} 条记录")
+            else:
+                logger.warning(f"⚠️  {args.update_stock_dividend} 未获取到分红数据")
+                
+        except Exception as e:
+            logger.error(f"✗ {args.update_stock_dividend} 分红数据更新失败: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    elif args.update_stock:
         # 更新单只股票
         logger.info("="*60)
         if args.full:

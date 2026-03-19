@@ -164,6 +164,14 @@ python update_financial_data.py --update-stock 000001
 python main.py 000001
 ```
 
+### 示例4：更新单只股票分红数据
+```bash
+# 快速更新某只股票的分红数据
+python update_financial_data.py --update-stock-dividend 000333
+
+# 测试结果：✓ 000333.SZ 分红数据更新成功，共 36 条记录
+```
+
 ---
 
 ## 🎯 核心命令速查
@@ -175,7 +183,8 @@ python main.py 000001
 | `--init` | 首次初始化全A股数据 | 2-3小时 |
 | `--update-latest` | 增量更新最新季度 | 30-40分钟 |
 | `--update-stock 000001` | 更新单只股票 | <1分钟 |
-| `--update-dividend` | 更新分红数据 | 20-30分钟 |
+| `--update-stock-dividend 000333` | 更新单只股票分红 | <10秒 |
+| `--update-dividend` | 更新所有股票分红 | 20-30分钟 |
 | `--recalculate-all` | 重算核心指标 | 10-15分钟 |
 
 ### 报告生成命令
