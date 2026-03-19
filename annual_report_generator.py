@@ -270,7 +270,55 @@ class AnnualReportGenerator:
         df_result = df_result.reset_index()
         df_result.columns = output_columns
         
+        # 重新计算TTM的比率类指标（如果有TTM列）
+        if latest_quarter != 4:
+            self._recalculate_income_ratios(df_result, ttm_label)
+        
         return df_result
+    
+    def _recalculate_income_ratios(self, df: pd.DataFrame, ttm_col: str):
+        """
+        重新计算利润表中的比率类指标
+        
+        比率类指标不能用TTM公式（加减法）计算，必须用对应的分子/分母重新计算
+        """
+        def get_value(item_name):
+            row = df[df['项目'] == item_name]
+            if len(row) > 0 and ttm_col in df.columns:
+                val = row[ttm_col].values[0]
+                return val if pd.notna(val) else 0
+            return 0
+        
+        def set_value(item_name, value):
+            df.loc[df['项目'] == item_name, ttm_col] = value
+        
+        # 获取基础数据
+        营业收入 = get_value('营业收入')
+        营业成本 = get_value('营业成本')
+        毛利 = get_value('毛利')
+        税金及附加 = get_value('税金及附加')
+        销售费用 = get_value('销售费用')
+        管理费用 = get_value('管理费用')
+        研发费用 = get_value('研发费用')
+        资产减值损失 = get_value('资产减值损失')
+        信用减值损失 = get_value('信用减值损失')
+        净利润 = get_value('净利润')
+        
+        # 重新计算比率
+        if 营业收入 != 0:
+            set_value('营业成本率', 营业成本 / 营业收入)
+            set_value('毛利率', 毛利 / 营业收入)
+            set_value('营业税金及附加率', 税金及附加 / 营业收入)
+            set_value('销售费用率', 销售费用 / 营业收入)
+            set_value('管理费用率', 管理费用 / 营业收入)
+            set_value('研发费用率', 研发费用 / 营业收入)
+            set_value('资产减值损失率', (资产减值损失 + 信用减值损失) / 营业收入)
+            set_value('净利润率', 净利润 / 营业收入)
+            
+            # 其他可能的比率指标
+            息税前经营利润 = get_value('息税前经营利润')
+            if 息税前经营利润 != 0:
+                set_value('息税前经营利润率', 息税前经营利润 / 营业收入)
     
     def _generate_cashflow_statement_annual_with_ttm(
         self,
