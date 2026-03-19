@@ -46,6 +46,16 @@ class CoreIndicatorsAnalyzer:
         Returns:
             包含所有指标的DataFrame
         """
+        # 确保所有列名都是字符串类型（避免整数列名导致的匹配失败）
+        balance_sheet = balance_sheet.copy()
+        balance_sheet.columns = [str(col) for col in balance_sheet.columns]
+        
+        income_statement = income_statement.copy()
+        income_statement.columns = [str(col) for col in income_statement.columns]
+        
+        cashflow_statement = cashflow_statement.copy()
+        cashflow_statement.columns = [str(col) for col in cashflow_statement.columns]
+        
         # 1. 找出三大报表都有数据的报告期
         common_dates = self._get_common_dates(
             balance_sheet, income_statement, cashflow_statement

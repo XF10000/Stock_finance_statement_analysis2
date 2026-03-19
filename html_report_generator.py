@@ -57,6 +57,16 @@ class HTMLReportGenerator:
         Returns:
             生成的HTML文件路径
         """
+        # 确保所有 DataFrame 的列名都是字符串类型（避免整数列名导致的匹配失败）
+        balance_data = balance_data.copy()
+        balance_data.columns = [str(col) for col in balance_data.columns]
+        
+        income_data = income_data.copy()
+        income_data.columns = [str(col) for col in income_data.columns]
+        
+        cashflow_data = cashflow_data.copy()
+        cashflow_data.columns = [str(col) for col in cashflow_data.columns]
+        
         # 提取日期列（排除"项目"列），并反转顺序（从远到近）
         date_columns = [col for col in balance_data.columns if col != '项目']
         date_columns = list(reversed(date_columns))  # 反转时间轴：从远期到近期

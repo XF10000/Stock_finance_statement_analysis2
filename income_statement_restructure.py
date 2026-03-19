@@ -121,19 +121,27 @@ def restructure_income_statement(df: pd.DataFrame,
                                   equity_data: pd.DataFrame = None,
                                   equity_cost_rate: float = 0.08) -> pd.DataFrame:
     """
-    重构利润表：将传统结构转换为股权价值增加表
+    重构利润表：将传统利润表转换为股权价值增加表
     
     Args:
-        df: 原始利润表数据
-            - 原始格式：每一行是一个报告期，字段名为列（如tushare返回的格式）
-            - 转置格式：字段名为行，日期为列（可选）
-        equity_data: 重构后的资产负债表数据，用于获取所有者权益合计
+        df: 转置后的利润表（行=报告期，列=项目）
+        equity_data: 资产负债表重构数据（用于获取所有者权益合计）
         equity_cost_rate: 股权资本成本率，默认8%
         
     Returns:
-        重构后的股权价值增加表 DataFrame
+        重构后的利润表（行=项目，列=报告期）
     """
     logger = logging.getLogger(__name__)
+    logger.info("开始重构利润表...")
+    
+    # 确保所有列名都是字符串类型（避免整数列名导致的匹配失败）
+    df = df.copy()
+    df.columns = [str(col) for col in df.columns]
+    
+    # 如果有 equity_data，也确保其列名是字符串
+    if equity_data is not None:
+        equity_data = equity_data.copy()
+        equity_data.columns = [str(col) for col in equity_data.columns]
     
     # 处理重复的列名（如 20250930, 20250930.1 等）
     df = _clean_duplicate_columns(df)

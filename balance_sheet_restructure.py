@@ -320,14 +320,17 @@ def restructure_balance_sheet(df: pd.DataFrame) -> pd.DataFrame:
     重构资产负债表：将传统结构转换为资产-资本结构
     
     Args:
-        df: 原始资产负债表数据
-            - 原始格式：每一行是一个报告期，字段名为列（如tushare返回的格式）
-            - 转置格式：字段名为行，日期为列（可选）
+        df: 转置后的资产负债表（行=报告期，列=项目）
         
     Returns:
-        重构后的资产负债表 DataFrame
+        重构后的资产负债表（行=项目，列=报告期）
     """
     logger = logging.getLogger(__name__)
+    logger.info("开始重构资产负债表...")
+    
+    # 确保所有列名都是字符串类型（避免整数列名导致的匹配失败）
+    df = df.copy()
+    df.columns = [str(col) for col in df.columns]
     
     # 确保数据格式正确
     if '字段名' in df.columns:

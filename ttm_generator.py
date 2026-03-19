@@ -38,6 +38,16 @@ class TTMGenerator:
         Returns:
             包含 TTM 数据的字典 {'balance': df, 'income': df, 'cashflow': df}
         """
+        # 确保所有 DataFrame 的列名都是字符串类型（避免整数列名导致的匹配失败）
+        balance_data = balance_data.copy()
+        balance_data.columns = [str(col) for col in balance_data.columns]
+        
+        income_data = income_data.copy()
+        income_data.columns = [str(col) for col in income_data.columns]
+        
+        cashflow_data = cashflow_data.copy()
+        cashflow_data.columns = [str(col) for col in cashflow_data.columns]
+        
         # 确定日期列名
         date_col = '报告期' if '报告期' in balance_data.columns else 'end_date'
         
