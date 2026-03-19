@@ -1,24 +1,46 @@
-# 股票财务数据获取工具
+# A股财务数据分析系统
 
-基于 Tushare API 的股票财务数据获取工具，支持获取完整的财务报表数据（包括默认隐藏字段），并可将字段名翻译为中文。
+基于 Tushare 的全A股财务数据获取、存储、分析和可视化系统。
 
-## 功能特性
+## ✨ 功能特点
 
-- ✅ 获取完整的财务数据（包括默认显示为 N 的隐藏字段）
-- ✅ 支持四大财务报表：财务指标表、资产负债表、利润表、现金流量表
-- ✅ **字段名自动翻译**：可将英文字段名翻译为中文，方便理解和使用
-- ✅ 自动过滤上市前的无效数据
-- ✅ 支持分页获取大数据量数据
-- ✅ 支持错误重试机制
-- ✅ 支持导出为 CSV 或 Excel 格式
+### 数据管理
+- ✅ 自动获取全A股财务数据（5,100+ 只股票）
+- ✅ 财务四表：资产负债表、利润表、现金流量表、财务指标
+- ✅ 分红数据：现金分红、送股、转增
+- ✅ 本地 SQLite 数据库存储
+- ✅ 智能增量更新（批量检查 + 按需获取）
+- ✅ 股票代码自动补全（支持不带后缀）
 - ✅ 完善的日志记录和错误处理
 
-## 安装依赖
+### 数据分析
+- ✅ 5大核心指标计算（应收账款周转率、毛利率、长期资产周转率、净营运资本比率、经营现金流比率）
+- ✅ 年报 + TTM（滚动12个月）双视角分析
+- ✅ 市场分位数排名
+- ✅ 自由现金流（FCFF）分析
+
+### 报告生成
+- ✅ 完整的 HTML 可视化报告（ECharts 图表）
+- ✅ 资产负债、利润、现金流、核心指标 4大分析模块
+- ✅ Excel 汇总报告
+- ✅ FCFF 专项报告
+
+### 性能优化
+- ✅ API 限流控制（150次/分钟）
+- ✅ 批量数据库操作
+- ✅ 多线程并发获取
+- ✅ 智能季度判断（避免获取未发布数据）
+- ✅ 批量检查优化（5,191只股票仅需0.4秒）
+
+## 🚀 快速开始
+
+### 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
+### 配置
 ## 配置
 
 1. 复制配置文件模板：
@@ -126,6 +148,71 @@ python main.py 600519.SH --start-date 20200101 --end-date 20231231
 ```
 
 保存为 Excel 格式：
+
+```bash
+python main.py 600519.SH --format excel
+```
+
+### 3. 数据更新管理
+
+#### 首次初始化（获取全A股数据）
+```bash
+python update_financial_data.py --init
+```
+- 获取全A股列表（约5,100只）
+- 获取每只股票的完整历史财务数据
+- 自动计算核心指标
+- 支持断点续传：`--resume 000333`
+
+#### 增量更新（推荐定期运行）
+```bash
+python update_financial_data.py --update-latest
+```
+**智能优化**：
+- ✅ 根据当前月份自动判断目标季度
+  - 2-4月 → 上年Q4
+  - 5-7月 → 本年Q1  
+  - 8-10月 → 本年Q2
+  - 11-1月 → 本年Q3
+- ✅ 批量检查（0.4秒完成5,191只股票）
+- ✅ 只更新缺失的股票（节省80%+ API调用）
+
+#### 更新单只股票
+```bash
+# 增量更新（最新季度）
+python update_financial_data.py --update-stock 000001
+
+# 完整更新（全部历史）
+python update_financial_data.py --update-stock 000001 --full
+```
+**特性**：支持不带后缀的股票代码（000001 → 000001.SZ）
+
+#### 更新分红数据
+```bash
+python update_financial_data.py --update-dividend
+```
+**智能优化**：根据每只股票财务数据最新季度获取分红
+
+#### 重新计算核心指标
+```bash
+python update_financial_data.py --recalculate-all
+```
+
+### 4. 高级选项
+
+#### 指定季度更新
+```bash
+python update_financial_data.py --update-latest --quarter 20241231
+```
+
+#### 调整并发线程数
+```bash
+python update_financial_data.py --update-latest --workers 8
+```
+
+#### 不自动计算核心指标
+```bash
+python update_financial_data.py --update-latest --no-indicators
 
 ```bash
 python main.py 000858.SZ --format excel

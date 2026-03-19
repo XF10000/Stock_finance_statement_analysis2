@@ -100,6 +100,10 @@ def restructure_cashflow_statement(
         # 已经是转置格式
         df_data = df_cashflow.set_index('字段名')
         logger.info("输入数据为转置格式")
+    elif '项目' in df_cashflow.columns:
+        # 已经是转置格式：项目名为第一列（从 main.py 传入）
+        df_data = df_cashflow.set_index('项目')
+        logger.info("输入数据为转置格式（项目列）")
     elif '报告期' in df_cashflow.columns or 'end_date' in df_cashflow.columns:
         # 原始格式：需要转置
         logger.info("输入数据为原始格式，进行转置...")
@@ -678,7 +682,8 @@ def _clean_duplicate_columns(df: pd.DataFrame) -> pd.DataFrame:
     
     for col in df.columns:
         # 去掉 .1, .2 等后缀
-        base_name = col.split('.')[0]
+        col_str = str(col)
+        base_name = col_str.split('.')[0]
         
         if base_name not in seen:
             seen[base_name] = col

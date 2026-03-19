@@ -14,6 +14,7 @@ import yaml
 import os
 from queue import Queue
 import pandas as pd
+from tqdm import tqdm
 from tushare_client import TushareClient
 from financial_data_manager import FinancialDataManager
 
@@ -78,8 +79,8 @@ class FinancialDataUpdater:
         # 初始化数据库管理器
         self.db_manager = FinancialDataManager(db_path)
         
-        # 初始化限流器（200次/分钟）
-        self.rate_limiter = RateLimiter(max_calls=200, period=60)
+        # 初始化限流器（150次/分钟，留出安全余量避免触发 Tushare 限速）
+        self.rate_limiter = RateLimiter(max_calls=150, period=60)
         
         # 统计信息
         self.stats = {
@@ -91,6 +92,12 @@ class FinancialDataUpdater:
             'failed_stocks': []
         }
         self.stats_lock = threading.Lock()
+        
+        # 批量写入队列和线程
+        self.write_queue = Queue()
+        self.batch_size = 50  # 每批写入50条数据
+        self.writer_running = False
+        self.writer_thread = None
     
     def get_all_a_stocks(self, exclude_bse: bool = True) -> List[Dict]:
         """
@@ -144,6 +151,180 @@ class FinancialDataUpdater:
                 self.logger.warning(f"保存股票 {stock['ts_code']} 失败: {e}")
         
         return stocks
+    
+    def start_batch_writer(self):
+        """启动批量写入线程"""
+        if self.writer_running:
+            return
+        
+        self.writer_running = True
+        self.writer_thread = threading.Thread(
+            target=self._batch_writer_worker,
+            daemon=True,
+            name="BatchWriter"
+        )
+        self.writer_thread.start()
+        self.logger.info("批量写入线程已启动")
+    
+    def stop_batch_writer(self):
+        """停止批量写入线程并等待队列清空"""
+        if not self.writer_running:
+            return
+        
+        self.logger.info("等待写入队列清空...")
+        self.write_queue.put(None)  # 发送停止信号
+        
+        if self.writer_thread:
+            self.writer_thread.join(timeout=60)  # 最多等待60秒
+        
+        self.writer_running = False
+        self.logger.info("批量写入线程已停止")
+    
+    def _batch_writer_worker(self):
+        """批量写入工作线程"""
+        batch = []
+        
+        while self.writer_running:
+            try:
+                # 尝试获取数据，超时1秒
+                item = self.write_queue.get(timeout=1)
+                
+                # 收到停止信号
+                if item is None:
+                    # 写入剩余数据
+                    if batch:
+                        self._write_batch(batch)
+                    break
+                
+                batch.append(item)
+                
+                # 达到批量大小，立即写入
+                if len(batch) >= self.batch_size:
+                    self._write_batch(batch)
+                    batch = []
+                    
+            except Exception as e:
+                # 队列为空或超时，写入当前批次
+                if batch:
+                    self._write_batch(batch)
+                    batch = []
+    
+    def _write_batch(self, batch: List[Dict]):
+        """执行批量写入"""
+        if not batch:
+            return
+        
+        try:
+            self.db_manager.save_financial_data_batch(batch)
+            self.logger.debug(f"批量写入 {len(batch)} 条数据成功")
+        except Exception as e:
+            self.logger.error(f"批量写入失败: {e}")
+            # 失败时尝试逐条写入
+            for item in batch:
+                try:
+                    self.db_manager.save_financial_data(
+                        ts_code=item['ts_code'],
+                        end_date=item['end_date'],
+                        data_type=item['data_type'],
+                        data=item['data']
+                    )
+                except Exception as e2:
+                    self.logger.error(f"单条写入失败 {item['ts_code']} {item['end_date']}: {e2}")
+    
+    
+    def fetch_dividend_data(self, client: TushareClient, ts_code: str, max_retries: int = 2) -> Optional[pd.DataFrame]:
+        """
+        获取分红送股数据（带重试机制）
+        根据该股票在数据库中的财务数据最新季度来确定获取范围
+        
+        Args:
+            client: TushareClient实例
+            ts_code: 股票代码
+            max_retries: 最大重试次数
+            
+        Returns:
+            分红送股数据DataFrame（中文列名）
+        """
+        import time
+        import pandas as pd
+        
+        # 查询该股票在数据库中的最新财务数据季度
+        end_date = None
+        try:
+            conn = self.db_manager.get_connection()
+            query = f"""
+                SELECT MAX(end_date) as latest_date
+                FROM balancesheet
+                WHERE ts_code = '{ts_code}'
+            """
+            result = pd.read_sql_query(query, conn)
+            conn.close()
+            
+            if not result.empty and not pd.isna(result['latest_date'].iloc[0]):
+                end_date = str(result['latest_date'].iloc[0])
+                self.logger.debug(f"{ts_code} 财务数据最新季度: {end_date}，获取该季度及以前的分红数据")
+        except Exception as e:
+            self.logger.debug(f"查询 {ts_code} 最新财务季度失败: {e}，将获取所有分红数据")
+        
+        for attempt in range(max_retries + 1):
+            try:
+                # 等待限流
+                self.rate_limiter.wait()
+                
+                # 获取分红数据（如果有end_date则只获取该季度及以前的）
+                if end_date:
+                    df = client.pro.dividend(
+                        ts_code=ts_code,
+                        end_date=end_date,  # 只获取该季度及以前的分红
+                        fields='end_date,ann_date,div_proc,stk_div,stk_bo_rate,stk_co_rate,cash_div,cash_div_tax,record_date,ex_date,pay_date,div_listdate,imp_ann_date'
+                    )
+                else:
+                    # 如果没有财务数据，获取所有分红数据
+                    df = client.pro.dividend(
+                        ts_code=ts_code,
+                        fields='end_date,ann_date,div_proc,stk_div,stk_bo_rate,stk_co_rate,cash_div,cash_div_tax,record_date,ex_date,pay_date,div_listdate,imp_ann_date'
+                    )
+                
+                if df is None or len(df) == 0:
+                    self.logger.debug(f"{ts_code} 未获取到分红数据")
+                    return None
+                
+                # 按报告期排序
+                df = df.sort_values('end_date', ascending=False)
+                
+                # 重命名列为中文
+                df_renamed = df.rename(columns={
+                    'end_date': '报告期',
+                    'ann_date': '公告日期',
+                    'div_proc': '分红进度',
+                    'stk_div': '送股比例',
+                    'stk_bo_rate': '转增比例',
+                    'stk_co_rate': '配股比例',
+                    'cash_div': '每股派息(税前)',
+                    'cash_div_tax': '每股派息(税后)',
+                    'record_date': '股权登记日',
+                    'ex_date': '除权除息日',
+                    'pay_date': '派息日',
+                    'div_listdate': '红股上市日',
+                    'imp_ann_date': '实施公告日'
+                })
+                
+                return df_renamed
+                
+            except Exception as e:
+                error_msg = str(e)
+                # 如果是 "No columns to parse" 错误且还有重试机会，则重试
+                if "No columns to parse" in error_msg and attempt < max_retries:
+                    self.logger.debug(f"{ts_code} API返回空响应，重试 {attempt + 1}/{max_retries}")
+                    time.sleep(0.5)  # 等待 0.5 秒后重试
+                    continue
+                else:
+                    # 最后一次尝试失败，或其他类型错误
+                    if "No columns to parse" not in error_msg:
+                        self.logger.warning(f"获取 {ts_code} 分红数据失败: {e}")
+                    return None
+        
+        return None
     
     def fetch_stock_all_data(self, ts_code: str, force_update: bool = False) -> bool:
         """
@@ -216,19 +397,26 @@ class FinancialDataUpdater:
                         # 筛选该报告期的数据
                         period_data = df[df[date_col] == end_date].copy()
                         
-                        try:
-                            self.db_manager.save_financial_data(
-                                ts_code=ts_code,
-                                end_date=str(end_date),
-                                data_type=table_name,
-                                data=period_data
-                            )
-                            saved_count += 1
-                        except Exception as e:
-                            self.logger.warning(f"保存 {ts_code} {table_name} {end_date} 失败: {e}")
+                        # 放入写入队列，而非直接写入
+                        self.write_queue.put({
+                            'ts_code': ts_code,
+                            'end_date': str(end_date),
+                            'data_type': table_name,
+                            'data': period_data
+                        })
+                        saved_count += 1
+            
+            # 获取并保存分红数据
+            try:
+                dividend_df = self.fetch_dividend_data(client, ts_code)
+                if dividend_df is not None and len(dividend_df) > 0:
+                    self.db_manager.save_dividend_data(ts_code, dividend_df)
+                    self.logger.info(f"✓ {ts_code} 成功保存 {len(dividend_df)} 条分红数据")
+            except Exception as e:
+                self.logger.warning(f"保存 {ts_code} 分红数据失败: {e}")
             
             if saved_count > 0:
-                self.logger.info(f"✓ {ts_code} 成功保存 {saved_count} 条记录")
+                self.logger.info(f"✓ {ts_code} 成功保存 {saved_count} 条财务记录")
                 with self.stats_lock:
                     self.stats['success'] += 1
                 return True
@@ -268,25 +456,37 @@ class FinancialDataUpdater:
         self.logger.info(f"开始更新 {len(stocks)} 只股票的数据...")
         self.logger.info(f"使用 {self.max_workers} 个工作线程")
         
-        # 使用线程池
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # 提交所有任务
-            futures = {
-                executor.submit(self.fetch_stock_all_data, stock['ts_code'], force_update): stock
-                for stock in stocks
-            }
-            
-            # 处理完成的任务
-            for i, future in enumerate(as_completed(futures), 1):
-                stock = futures[future]
-                try:
-                    future.result()
-                except Exception as e:
-                    self.logger.error(f"处理 {stock['ts_code']} 时发生异常: {e}")
+        # 启动批量写入线程
+        self.start_batch_writer()
+        
+        try:
+            # 使用线程池
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                # 提交所有任务
+                futures = {
+                    executor.submit(self.fetch_stock_all_data, stock['ts_code'], force_update): stock
+                    for stock in stocks
+                }
                 
-                # 显示进度
-                if i % 10 == 0 or i == len(stocks):
-                    self._print_progress(i, len(stocks))
+                # 使用 tqdm 进度条
+                with tqdm(total=len(stocks), desc="数据采集进度", unit="只") as pbar:
+                    for future in as_completed(futures):
+                        stock = futures[future]
+                        try:
+                            future.result()
+                        except Exception as e:
+                            self.logger.error(f"处理 {stock['ts_code']} 时发生异常: {e}")
+                        
+                        # 更新进度条
+                        pbar.update(1)
+                        pbar.set_postfix({
+                            '成功': self.stats['success'],
+                            '失败': self.stats['failed'],
+                            '跳过': self.stats['skipped']
+                        })
+        finally:
+            # 停止批量写入线程并等待队列清空
+            self.stop_batch_writer()
         
         # 打印最终统计
         self._print_final_stats()
@@ -329,10 +529,13 @@ class FinancialDataUpdater:
                 self.logger.warning(f"  ... 还有 {len(self.stats['failed_stocks'])-20} 只")
         
         # 数据库统计
-        db_stats = self.db_manager.get_database_stats()
-        self.logger.info("\n数据库统计:")
-        for table, count in db_stats.items():
-            self.logger.info(f"  {table}: {count:,} 条记录")
+        try:
+            db_stats = self.db_manager.get_database_stats()
+            self.logger.info("\n数据库统计:")
+            for table, count in db_stats.items():
+                self.logger.info(f"  {table}: {count:,} 条记录")
+        except Exception as e:
+            self.logger.debug(f"获取数据库统计失败: {e}")
         
         self.logger.info("="*60 + "\n")
     
@@ -420,19 +623,21 @@ class FinancialDataUpdater:
                     df_filtered = df[df[date_col] == target_quarter]
                     
                     if len(df_filtered) > 0:
-                        try:
-                            self.db_manager.save_financial_data(
-                                ts_code=ts_code,
-                                end_date=target_quarter,
-                                data_type=table_name,
-                                data=df_filtered
-                            )
-                            saved_count += 1
-                        except Exception as e:
-                            self.logger.warning(f"保存 {ts_code} {table_name} {target_quarter} 失败: {e}")
+                        # 放入写入队列，而非直接写入
+                        self.write_queue.put({
+                            'ts_code': ts_code,
+                            'end_date': target_quarter,
+                            'data_type': table_name,
+                            'data': df_filtered
+                        })
+                        saved_count += 1
+            
+            # 注意：分红数据不在此处更新
+            # 请使用 --update-dividend 参数专门更新分红数据
+            # 总股本数据已从资产负债表中直接获取，不需要单独更新
             
             if saved_count > 0:
-                self.logger.info(f"✓ {ts_code} 成功保存 {saved_count} 条记录")
+                self.logger.info(f"✓ {ts_code} 成功保存 {saved_count} 条财务记录")
                 with self.stats_lock:
                     self.stats['success'] += 1
                 return True
@@ -448,17 +653,105 @@ class FinancialDataUpdater:
                 self.stats['failed_stocks'].append(ts_code)
             return False
     
+    def _determine_target_quarter_smart(self) -> str:
+        """
+        智能判断目标季度（财务数据）
+        根据当前月份判断应该尝试获取的季度：
+        - 2-4月：尝试上年Q4
+        - 5-7月：尝试本年Q1
+        - 8-10月：尝试本年Q2
+        - 11-1月：尝试本年Q3
+        
+        Returns:
+            目标季度字符串，如 '20240930'
+        """
+        now = datetime.now()
+        year = now.year
+        month = now.month
+        
+        # 根据当前月份判断应该尝试获取的季度
+        if 2 <= month <= 4:
+            # 2-4月：尝试上年Q4
+            target_quarter = f"{year-1}1231"
+            self.logger.info(f"当前月份 {month}，尝试获取上年Q4: {target_quarter}")
+        elif 5 <= month <= 7:
+            # 5-7月：尝试本年Q1
+            target_quarter = f"{year}0331"
+            self.logger.info(f"当前月份 {month}，尝试获取本年Q1: {target_quarter}")
+        elif 8 <= month <= 10:
+            # 8-10月：尝试本年Q2
+            target_quarter = f"{year}0630"
+            self.logger.info(f"当前月份 {month}，尝试获取本年Q2: {target_quarter}")
+        else:  # 11, 12, 1
+            # 11-1月：尝试本年Q3
+            target_quarter = f"{year}0930"
+            self.logger.info(f"当前月份 {month}，尝试获取本年Q3: {target_quarter}")
+        
+        return target_quarter
+    
+    def _batch_check_missing_stocks(self, stocks: List[Dict], target_quarter: str) -> List[Dict]:
+        """
+        批量检查哪些股票缺少目标季度的数据
+        使用单次 SQL 查询，避免逐只查询
+        
+        Args:
+            stocks: 股票列表
+            target_quarter: 目标季度
+            
+        Returns:
+            需要更新的股票列表
+        """
+        import pandas as pd
+        
+        conn = self.db_manager.get_connection()
+        
+        try:
+            # 提取所有股票代码
+            stock_codes = [s['ts_code'] for s in stocks]
+            
+            # 构建 SQL IN 子句
+            codes_str = "','".join(stock_codes)
+            
+            # 一次性查询所有已有数据的股票
+            query = f"""
+                SELECT DISTINCT ts_code 
+                FROM balancesheet 
+                WHERE ts_code IN ('{codes_str}') 
+                AND end_date = '{target_quarter}'
+            """
+            
+            existing_df = pd.read_sql_query(query, conn)
+            existing_stocks = set(existing_df['ts_code'].tolist())
+            
+            # 找出缺失的股票
+            stocks_need_update = [s for s in stocks if s['ts_code'] not in existing_stocks]
+            
+            self.logger.info(f"  已有数据: {len(existing_stocks)} 只")
+            self.logger.info(f"  需要更新: {len(stocks_need_update)} 只")
+            
+            return stocks_need_update
+            
+        except Exception as e:
+            self.logger.error(f"批量检查失败: {e}")
+            # 出错时返回所有股票（保守策略）
+            return stocks
+        finally:
+            conn.close()
+    
     def update_latest_quarter(self, target_quarter: str = None, 
                              calculate_indicators: bool = True):
         """
         增量更新最新季度的数据
+        优化：
+        1. 智能季度判断：根据数据库中财务数据的最新时间确定目标季度
+        2. 批量检查：先批量检查数据库，只对缺失的股票调用 API
         
         Args:
             target_quarter: 目标季度（如20241231），不指定则自动判断
             calculate_indicators: 是否自动计算核心指标
         """
         self.logger.info("="*60)
-        self.logger.info("增量更新最新季度数据")
+        self.logger.info("增量更新最新季度数据（优化版）")
         self.logger.info("="*60)
         
         # 获取所有股票
@@ -468,50 +761,66 @@ class FinancialDataUpdater:
             self.logger.error("数据库中没有股票列表，请先运行 --init")
             return
         
-        # 确定目标季度
+        # 优化1: 智能季度判断 - 如果未指定目标季度，根据数据库中的最新数据判断
         if not target_quarter:
-            now = datetime.now()
-            year = now.year
-            month = now.month
-            
-            if month <= 4:
-                target_quarter = f"{year-1}1231"
-            elif month <= 8:
-                target_quarter = f"{year}0331"
-            elif month <= 10:
-                target_quarter = f"{year}0630"
-            else:
-                target_quarter = f"{year}0930"
+            target_quarter = self._determine_target_quarter_smart()
+            self.logger.info(f"智能判断目标季度: {target_quarter}")
+        else:
+            self.logger.info(f"指定目标季度: {target_quarter}")
         
-        self.logger.info(f"目标季度: {target_quarter}")
         self.logger.info(f"股票总数: {len(stocks)}")
+        
+        # 优化2: 批量检查缺失数据
+        self.logger.info("\n批量检查缺失数据...")
+        stocks_need_update = self._batch_check_missing_stocks(stocks, target_quarter)
+        
+        if not stocks_need_update:
+            self.logger.info("✓ 所有股票的数据都已是最新，无需更新")
+            return
+        
+        self.logger.info(f"需要更新的股票: {len(stocks_need_update)} 只")
+        self.logger.info(f"跳过的股票: {len(stocks) - len(stocks_need_update)} 只")
         
         # 重置统计
         self.stats = {
-            'total': len(stocks),
+            'total': len(stocks_need_update),
             'success': 0,
             'failed': 0,
-            'skipped': 0,
+            'skipped': len(stocks) - len(stocks_need_update),
             'start_time': time.time(),
             'failed_stocks': []
         }
         
-        # 使用线程池更新
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {
-                executor.submit(self.fetch_stock_incremental, stock['ts_code'], target_quarter): stock
-                for stock in stocks
-            }
-            
-            for i, future in enumerate(as_completed(futures), 1):
-                stock = futures[future]
-                try:
-                    future.result()
-                except Exception as e:
-                    self.logger.error(f"处理 {stock['ts_code']} 时发生异常: {e}")
+        # 启动批量写入线程
+        self.start_batch_writer()
+        
+        try:
+            # 使用线程池更新（只更新需要的股票）
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                futures = {
+                    executor.submit(self.fetch_stock_incremental, stock['ts_code'], target_quarter): stock
+                    for stock in stocks_need_update
+                }
                 
-                if i % 10 == 0 or i == len(stocks):
-                    self._print_progress(i, len(stocks))
+                # 使用 tqdm 进度条
+                with tqdm(total=len(stocks_need_update), desc=f"更新 {target_quarter}", unit="只") as pbar:
+                    for future in as_completed(futures):
+                        stock = futures[future]
+                        try:
+                            future.result()
+                        except Exception as e:
+                            self.logger.error(f"处理 {stock['ts_code']} 时发生异常: {e}")
+                        
+                        # 更新进度条
+                        pbar.update(1)
+                        pbar.set_postfix({
+                            '成功': self.stats['success'],
+                            '失败': self.stats['failed'],
+                            '跳过': self.stats['skipped']
+                        })
+        finally:
+            # 停止批量写入线程并等待队列清空
+            self.stop_batch_writer()
         
         # 打印统计
         self._print_final_stats()
@@ -523,6 +832,179 @@ class FinancialDataUpdater:
             self.logger.info("="*60)
             
             self.calculate_core_indicators_batch(target_quarter)
+    
+    def update_dividend_and_totalshares(self):
+        """
+        更新所有股票的分红数据（只更新缺失的）
+        注：总股本数据已从资产负债表中直接获取，不需要单独更新
+        使用单线程模式 + 批量写入，避免并发导致的 API 错误
+        """
+        self.logger.info("="*60)
+        self.logger.info("更新分红数据（单线程模式）")
+        self.logger.info("注：总股本数据已从资产负债表中直接获取，不需要单独更新")
+        self.logger.info("="*60)
+        
+        # 获取所有股票
+        stocks = self.db_manager.get_all_stocks()
+        
+        self.stats = {
+            'total': len(stocks),
+            'success': 0,
+            'failed': 0,
+            'skipped': 0,
+            'dividend_updated': 0,
+            'start_time': time.time(),
+            'failed_stocks': []
+        }
+        
+        # 初始化 Tushare 客户端（单线程模式只需要一个）
+        client = TushareClient(config_path=self.config_path)
+        
+        # 批量存储待写入的分红数据
+        dividend_batch = []
+        batch_size = 50  # 每 50 条数据批量写入一次
+        
+        # 使用 tqdm 进度条，单线程顺序处理
+        with tqdm(total=len(stocks), desc="更新分红数据", unit="只") as pbar:
+            for stock in stocks:
+                ts_code = stock['ts_code']
+                
+                try:
+                    # 检查是否已有分红数据
+                    existing_dividend = self.db_manager.get_dividend_data(ts_code)
+                    
+                    if existing_dividend is None or len(existing_dividend) == 0:
+                        # 没有分红数据，获取
+                        dividend_df = self.fetch_dividend_data(client, ts_code)
+                        
+                        if dividend_df is not None and len(dividend_df) > 0:
+                            # 添加到批量写入列表
+                            dividend_batch.append({
+                                'ts_code': ts_code,
+                                'data': dividend_df
+                            })
+                            
+                            self.stats['dividend_updated'] += 1
+                            self.stats['success'] += 1
+                            
+                            # 达到批量大小，执行写入
+                            if len(dividend_batch) >= batch_size:
+                                self._batch_save_dividend(dividend_batch)
+                                dividend_batch = []
+                        else:
+                            self.stats['skipped'] += 1
+                    else:
+                        self.stats['skipped'] += 1
+                        
+                except Exception as e:
+                    self.logger.error(f"更新 {ts_code} 分红数据失败: {e}")
+                    self.stats['failed'] += 1
+                    self.stats['failed_stocks'].append(ts_code)
+                
+                # 更新进度条
+                pbar.update(1)
+                pbar.set_postfix({
+                    '成功': self.stats['success'],
+                    '失败': self.stats['failed'],
+                    '跳过': self.stats['skipped'],
+                    '分红': self.stats['dividend_updated']
+                })
+        
+        # 写入剩余的数据
+        if dividend_batch:
+            self._batch_save_dividend(dividend_batch)
+        
+        # 打印统计
+        self._print_final_stats_dividend()
+    
+    def _batch_save_dividend(self, dividend_batch):
+        """批量保存分红数据"""
+        for item in dividend_batch:
+            try:
+                self.db_manager.save_dividend_data(item['ts_code'], item['data'])
+            except Exception as e:
+                self.logger.error(f"保存 {item['ts_code']} 分红数据失败: {e}")
+    
+    def _update_single_stock_dividend(self, ts_code: str) -> bool:
+        """
+        更新单只股票的分红数据（只更新缺失的）
+        
+        Args:
+            ts_code: 股票代码
+            
+        Returns:
+            是否成功
+        """
+        try:
+            # 等待限流
+            self.rate_limiter.wait()
+            
+            # 初始化Tushare客户端
+            client = TushareClient(config_path=self.config_path)
+            
+            # 检查并更新分红数据
+            existing_dividend = self.db_manager.get_dividend_data(ts_code)
+            
+            if existing_dividend is None or len(existing_dividend) == 0:
+                # 没有分红数据，获取并保存
+                self.logger.info(f"{ts_code}: 缺少分红数据")
+                
+                try:
+                    dividend_df = self.fetch_dividend_data(client, ts_code)
+                    if dividend_df is not None and len(dividend_df) > 0:
+                        self.db_manager.save_dividend_data(ts_code, dividend_df)
+                        self.logger.info(f"✓ {ts_code} 成功保存分红数据，共 {len(dividend_df)} 条")
+                        with self.stats_lock:
+                            self.stats['dividend_updated'] += 1
+                            self.stats['success'] += 1
+                        return True
+                    else:
+                        with self.stats_lock:
+                            self.stats['skipped'] += 1
+                        return True
+                except Exception as e:
+                    self.logger.warning(f"获取 {ts_code} 分红数据失败: {e}")
+                    with self.stats_lock:
+                        self.stats['failed'] += 1
+                        self.stats['failed_stocks'].append(ts_code)
+                    return False
+            else:
+                self.logger.debug(f"{ts_code}: 分红数据已存在，跳过")
+                with self.stats_lock:
+                    self.stats['skipped'] += 1
+                return True
+                
+        except Exception as e:
+            self.logger.error(f"更新 {ts_code} 分红数据失败: {e}")
+            with self.stats_lock:
+                self.stats['failed'] += 1
+                self.stats['failed_stocks'].append(ts_code)
+            return False
+    
+    def _print_final_stats_dividend(self):
+        """打印分红更新最终统计"""
+        print()  # 换行
+        elapsed = time.time() - self.stats['start_time']
+        
+        self.logger.info("\n" + "="*60)
+        self.logger.info("分红数据更新完成统计")
+        self.logger.info("="*60)
+        self.logger.info(f"总股票数: {self.stats['total']} 只")
+        self.logger.info(f"成功: {self.stats['success']} 只")
+        self.logger.info(f"失败: {self.stats['failed']} 只")
+        self.logger.info(f"跳过: {self.stats['skipped']} 只")
+        self.logger.info(f"分红数据更新: {self.stats['dividend_updated']} 只")
+        self.logger.info(f"总耗时: {elapsed/60:.1f} 分钟")
+        self.logger.info(f"平均速度: {self.stats['total']/elapsed:.2f} 只/秒")
+        
+        if self.stats['failed_stocks']:
+            self.logger.warning(f"\n失败的股票 ({len(self.stats['failed_stocks'])} 只):")
+            for ts_code in self.stats['failed_stocks'][:20]:
+                self.logger.warning(f"  - {ts_code}")
+            if len(self.stats['failed_stocks']) > 20:
+                self.logger.warning(f"  ... 还有 {len(self.stats['failed_stocks'])-20} 只")
+        
+        self.logger.info("="*60 + "\n")
     
     def calculate_core_indicators_batch(self, target_quarter: str = None, 
                                        updated_stocks: List[str] = None):
@@ -913,32 +1395,106 @@ class FinancialDataUpdater:
         self.logger.info("="*60)
 
 
+def normalize_stock_code(ts_code: str) -> str:
+    """
+    规范化股票代码，自动补全交易所后缀
+    
+    Args:
+        ts_code: 股票代码（可以带或不带后缀）
+        
+    Returns:
+        规范化后的股票代码（带交易所后缀）
+    
+    Examples:
+        '000333' -> '000333.SZ'
+        '600519' -> '600519.SH'
+        '000001.SZ' -> '000001.SZ'
+    """
+    # 如果已经有后缀，直接返回
+    if '.' in ts_code:
+        return ts_code.upper()
+    
+    # 去除可能的空格
+    code = ts_code.strip()
+    
+    # 深圳：000、002、003、300开头
+    # 上海：600、601、603、605、688开头
+    if code.startswith(('000', '002', '003', '300')):
+        return f"{code}.SZ"
+    elif code.startswith(('600', '601', '603', '605', '688')):
+        return f"{code}.SH"
+    else:
+        # 默认深圳（兼容其他代码）
+        return f"{code}.SZ"
+
+
 def main():
     """主函数"""
-    parser = argparse.ArgumentParser(description='全A股数据更新程序')
-    parser.add_argument('--init', action='store_true', 
-                       help='首次初始化（获取全部历史数据）')
+    parser = argparse.ArgumentParser(
+        description='全A股财务数据更新程序',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+使用示例:
+  # 首次初始化（获取所有A股的全部历史数据）
+  python update_financial_data.py --init
+  
+  # 增量更新最新季度的财务四表数据和核心指标
+  python update_financial_data.py --update-latest
+  
+  # 更新单只股票的最新季度数据
+  python update_financial_data.py --update-stock 000001
+  
+  # 更新单只股票的完整历史数据
+  python update_financial_data.py --update-stock 000001 --full
+  
+  # 更新所有股票的分红数据（补充缺失数据）
+  python update_financial_data.py --update-dividend
+  
+  # 指定季度更新
+  python update_financial_data.py --update-latest --quarter 20241231
+  
+  # 强制重新计算所有核心指标
+  python update_financial_data.py --recalculate-all
+  
+  # 断点续传（从指定股票继续）
+  python update_financial_data.py --init --resume 000333
+        """
+    )
+    
+    # 主要操作参数
+    parser.add_argument('--init', action='store_true',
+                       help='首次初始化：获取所有A股的全部历史数据（财务四表+分红，总股本从资产负债表获取）')
     parser.add_argument('--update-latest', action='store_true',
-                       help='只更新最新季度数据（增量更新）')
-    parser.add_argument('--quarter', type=str,
-                       help='指定更新的季度（如20241231），不指定则自动判断')
-    parser.add_argument('--no-indicators', action='store_true',
-                       help='不自动计算核心指标')
+                       help='增量更新：只更新最新季度的财务四表数据和核心指标（不包括分红）')
+    parser.add_argument('--update-stock', type=str, metavar='CODE',
+                       help='更新单只股票（例如：000001 或 600519.SH），默认增量更新最新季度，配合 --full 可更新全部历史数据')
+    parser.add_argument('--update-dividend', action='store_true',
+                       help='更新所有股票的分红数据（补充缺失数据，不重复获取已有数据）')
     parser.add_argument('--recalculate-all', action='store_true',
-                       help='强制重新计算所有股票的核心指标（忽略已有指标）')
+                       help='强制重新计算所有股票的核心指标（清空现有指标后重新计算）')
+    parser.add_argument('--full', action='store_true',
+                       help='完整更新：获取全部历史数据（仅在 --update-stock 时有效）')
+    
+    # 辅助参数
+    parser.add_argument('--quarter', type=str,
+                       help='指定更新的季度（格式：YYYYMMDD，如 20241231），不指定则自动判断当前应更新的季度')
+    parser.add_argument('--no-indicators', action='store_true',
+                       help='不自动计算核心指标（仅在 --update-latest 时有效）')
     parser.add_argument('--force', action='store_true',
-                       help='强制更新（忽略已有数据）')
-    parser.add_argument('--resume', type=str,
-                       help='从指定股票代码继续（断点续传）')
+                       help='强制更新：忽略已有数据，重新获取（慎用，会消耗大量API积分）')
+    parser.add_argument('--resume', type=str, metavar='CODE',
+                       help='断点续传：从指定股票代码继续（例如：000333 或 000333.SZ）')
+    
+    # 配置参数
     parser.add_argument('--workers', type=int, default=5,
-                       help='工作线程数（默认5）')
+                       help='并发线程数（默认：5，建议范围：2-8）')
     parser.add_argument('--config', type=str, default='config.yaml',
-                       help='配置文件路径')
+                       help='配置文件路径（默认：config.yaml）')
     parser.add_argument('--db', type=str, default='database/financial_data.db',
-                       help='数据库路径')
+                       help='数据库文件路径（默认：database/financial_data.db）')
     parser.add_argument('--log-level', type=str, default='INFO',
                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
-                       help='日志级别')
+                       help='日志级别（默认：INFO）')
     
     args = parser.parse_args()
     
@@ -954,6 +1510,16 @@ def main():
     
     logger = logging.getLogger(__name__)
     
+    # 规范化 resume 参数（如果有）
+    if args.resume:
+        args.resume = normalize_stock_code(args.resume)
+        logger.info(f"断点续传股票代码规范化为: {args.resume}")
+    
+    # 规范化 update_stock 参数（如果有）
+    if args.update_stock:
+        args.update_stock = normalize_stock_code(args.update_stock)
+        logger.info(f"更新股票代码规范化为: {args.update_stock}")
+    
     # 初始化更新器
     updater = FinancialDataUpdater(
         config_path=args.config,
@@ -961,7 +1527,43 @@ def main():
         max_workers=args.workers
     )
     
-    if args.init:
+    if args.update_stock:
+        # 更新单只股票
+        logger.info("="*60)
+        if args.full:
+            logger.info(f"更新单只股票的完整历史数据: {args.update_stock}")
+        else:
+            logger.info(f"更新单只股票的最新季度数据: {args.update_stock}")
+        logger.info("="*60)
+        
+        if args.full:
+            # 完整更新
+            success = updater.fetch_stock_all_data(args.update_stock, force_update=True)
+            if success:
+                logger.info(f"\n✓ {args.update_stock} 完整历史数据更新成功")
+            else:
+                logger.error(f"\n✗ {args.update_stock} 完整历史数据更新失败")
+        else:
+            # 增量更新最新季度
+            target_quarter = args.quarter if args.quarter else updater._determine_target_quarter_smart()
+            logger.info(f"目标季度: {target_quarter}")
+            
+            success = updater.fetch_stock_incremental(args.update_stock, target_quarter)
+            if success:
+                logger.info(f"\n✓ {args.update_stock} 最新季度数据更新成功")
+                
+                # 计算核心指标
+                if not args.no_indicators:
+                    logger.info("\n计算核心指标...")
+                    try:
+                        updater.calculate_core_indicators_single(args.update_stock, target_quarter)
+                        logger.info("✓ 核心指标计算完成")
+                    except Exception as e:
+                        logger.error(f"计算核心指标失败: {e}")
+            else:
+                logger.error(f"\n✗ {args.update_stock} 最新季度数据更新失败")
+        
+    elif args.init:
         # 首次初始化
         logger.info("="*60)
         logger.info("首次初始化：获取全A股数据")
@@ -981,6 +1583,24 @@ def main():
             resume_from=args.resume
         )
         
+        # 自动计算核心指标（年报 + TTM）
+        logger.info("\n" + "="*60)
+        logger.info("开始计算核心指标（年报 + TTM）...")
+        logger.info("="*60)
+        
+        try:
+            # 计算年报核心指标
+            updater.calculate_core_indicators_batch()
+            
+            # 计算 TTM 核心指标
+            updater.calculate_ttm_indicators_batch()
+            
+            logger.info("\n✓ 核心指标计算完成")
+        except Exception as e:
+            logger.error(f"计算核心指标失败: {e}")
+            import traceback
+            traceback.print_exc()
+        
     elif args.update_latest:
         # 更新最新季度
         logger.info("="*60)
@@ -991,6 +1611,15 @@ def main():
             target_quarter=args.quarter,
             calculate_indicators=not args.no_indicators
         )
+        
+    elif args.update_dividend:
+        # 更新分红数据
+        logger.info("="*60)
+        logger.info("更新所有股票的分红数据")
+        logger.info("注：总股本数据已从资产负债表中直接获取，不需要单独更新")
+        logger.info("="*60)
+        
+        updater.update_dividend_and_totalshares()
         
     elif args.recalculate_all:
         # 强制重新计算所有核心指标（年报 + TTM）

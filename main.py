@@ -4,7 +4,7 @@
 
 import argparse
 from datetime import datetime
-from tushare_client import TushareClient
+from financial_data_manager import FinancialDataManager
 from balance_sheet_restructure import restructure_balance_sheet
 from income_statement_restructure import restructure_income_statement
 from cashflow_statement_restructure import restructure_cashflow_statement
@@ -12,74 +12,64 @@ from annual_report_generator import AnnualReportGenerator
 import os
 import yaml
 import pandas as pd
-import time
 
 
-def get_total_share_data(client: TushareClient, ts_code: str, balance_df: pd.DataFrame) -> dict:
+def transpose_data(df: pd.DataFrame) -> pd.DataFrame:
     """
-    获取总股本数据
+    转置财务数据：将字段横向、时间纵向的格式转换为字段纵向、时间横向的格式
     
     Args:
-        client: TushareClient实例
-        ts_code: 股票代码
-        balance_df: 资产负债表数据
+        df: 原始数据（字段横向，时间纵向）
         
     Returns:
-        字典，key为报告期（YYYYMMDD格式），value为总股本（股）
+        转置后的数据（字段纵向，时间横向）
     """
-    if balance_df is None or len(balance_df) == 0:
-        return None
+    if df is None or len(df) == 0:
+        return df
     
-    # 获取所有报告期
-    end_date_col = '报告期' if '报告期' in balance_df.columns else 'end_date'
-    if end_date_col not in balance_df.columns:
-        return None
+    # 找到日期列
+    date_col = None
+    for col in ['end_date', '报告期']:
+        if col in df.columns:
+            date_col = col
+            break
     
-    report_dates = balance_df[end_date_col].unique()
-    total_share_dict = {}
+    if date_col is None:
+        return df
     
-    for report_date in report_dates:
-        try:
-            # 提取年份
-            year = str(report_date)[:4]
-            
-            # 查询该年度12月的交易日数据
-            start_date = f"{year}1201"
-            end_date = f"{year}1231"
-            
-            df = client.pro.daily_basic(
-                ts_code=ts_code,
-                start_date=start_date,
-                end_date=end_date,
-                fields='trade_date,total_share'
-            )
-            
-            if df is not None and len(df) > 0:
-                # 取最后一个交易日的总股本
-                df = df.sort_values('trade_date', ascending=False)
-                total_share = df['total_share'].values[0] * 10000 if pd.notna(df['total_share'].values[0]) else None
-                total_share_dict[str(report_date)] = total_share
-            
-            # API限流
-            time.sleep(0.3)
-        except Exception as e:
-            print(f"  获取 {report_date} 总股本失败: {e}")
-            continue
+    # 设置日期为索引
+    df_copy = df.copy()
+    df_copy = df_copy.set_index(date_col)
     
-    return total_share_dict if total_share_dict else None
+    # 转置
+    df_transposed = df_copy.T
+    
+    # 重置索引，将字段名作为一列
+    df_transposed = df_transposed.reset_index()
+    df_transposed = df_transposed.rename(columns={'index': '项目'})
+    
+    return df_transposed
 
 
-def add_total_share_to_balance(df_balance: pd.DataFrame, total_share_data: dict) -> pd.DataFrame:
+def add_total_share_to_balance(df_balance: pd.DataFrame, total_share_df: pd.DataFrame) -> pd.DataFrame:
     """
     将总股本数据添加到资产负债表中
     
     Args:
         df_balance: 重构后的资产负债表
-        total_share_data: 总股本数据字典
+        total_share_df: 总股本数据DataFrame（从数据库读取）
         
     Returns:
         添加了总股本行的资产负债表
     """
+    if total_share_df is None or len(total_share_df) == 0:
+        return df_balance
+    
+    # 创建总股本字典
+    total_share_dict = {}
+    for _, row in total_share_df.iterrows():
+        total_share_dict[str(row['end_date'])] = row['total_share']
+    
     # 创建总股本行
     total_share_row = {'项目': '总股本'}
     
@@ -92,66 +82,12 @@ def add_total_share_to_balance(df_balance: pd.DataFrame, total_share_data: dict)
         if 'TTM' in col:
             col_key = col[:4] + '1231'  # TTM使用当年12月31日
         
-        total_share_row[col] = total_share_data.get(col_key)
+        total_share_row[col] = total_share_dict.get(col_key)
     
     # 将总股本行添加到资产负债表末尾
     df_result = pd.concat([df_balance, pd.DataFrame([total_share_row])], ignore_index=True)
     
     return df_result
-
-
-def get_dividend_data(client: TushareClient, ts_code: str, output_dir: str) -> pd.DataFrame:
-    """
-    获取分红送股数据并保存为Excel文件
-    
-    Args:
-        client: TushareClient实例
-        ts_code: 股票代码
-        output_dir: 输出目录
-        
-    Returns:
-        分红送股数据DataFrame
-    """
-    try:
-        # 获取分红数据
-        df = client.pro.dividend(
-            ts_code=ts_code,
-            fields='end_date,ann_date,div_proc,stk_div,stk_bo_rate,stk_co_rate,cash_div,cash_div_tax,record_date,ex_date,pay_date,div_listdate,imp_ann_date'
-        )
-        
-        if df is None or len(df) == 0:
-            print("  未获取到分红数据")
-            return None
-        
-        # 按报告期排序
-        df = df.sort_values('end_date', ascending=False)
-        
-        # 重命名列为中文
-        df_renamed = df.rename(columns={
-            'end_date': '报告期',
-            'ann_date': '公告日期',
-            'div_proc': '分红进度',
-            'stk_div': '送股比例',
-            'stk_bo_rate': '转增比例',
-            'stk_co_rate': '配股比例',
-            'cash_div': '每股派息(税前)',
-            'cash_div_tax': '每股派息(税后)',
-            'record_date': '股权登记日',
-            'ex_date': '除权除息日',
-            'pay_date': '派息日',
-            'div_listdate': '红股上市日',
-            'imp_ann_date': '实施公告日'
-        })
-        
-        # 保存为Excel
-        excel_filename = os.path.join(output_dir, f"{ts_code}_分红送股.xlsx")
-        df_renamed.to_excel(excel_filename, index=False)
-        print(f"✓ 分红送股数据已保存到: {excel_filename}")
-        
-        return df_renamed
-    except Exception as e:
-        print(f"  获取分红数据失败: {e}")
-        return None
 
 
 def normalize_stock_code(ts_code: str) -> str:
@@ -189,89 +125,84 @@ def normalize_stock_code(ts_code: str) -> str:
 
 
 def main():
-    """主函数"""
-    parser = argparse.ArgumentParser(description='从 Tushare 获取公司财务数据')
+    """主函数 - 从数据库读取财务数据并生成分析报告"""
+    parser = argparse.ArgumentParser(description='从本地数据库读取财务数据并生成分析报告')
     parser.add_argument('ts_code', type=str, help='股票代码（例如：000333 或 600519.SH）')
-    parser.add_argument('--start-date', type=str, help='开始日期（YYYYMMDD）')
-    parser.add_argument('--end-date', type=str, help='结束日期（YYYYMMDD）')
+    parser.add_argument('--start-date', type=str, help='开始日期（YYYYMMDD）- 筛选数据库中的数据')
+    parser.add_argument('--end-date', type=str, help='结束日期（YYYYMMDD）- 筛选数据库中的数据')
     parser.add_argument('--output-dir', type=str, default='./data', help='数据输出目录')
     parser.add_argument('--format', type=str, choices=['csv', 'excel', 'both'], 
                        default='csv', help='输出格式（csv/excel/both）')
-    parser.add_argument('--no-transpose', action='store_true', 
-                       help='不转置数据（使用原始格式：字段横向，时间纵向）')
-    parser.add_argument('--no-translate', action='store_true', help='不翻译字段名（使用英文列名）')
-    parser.add_argument('--config', type=str, default='config.yaml', help='配置文件路径')
+    parser.add_argument('--db-path', type=str, default='database/financial_data.db', 
+                       help='数据库路径')
     parser.add_argument('--annual-ttm', action='store_true', default=True,
                        help='生成年报+TTM重构报表（默认开启，使用--no-annual-ttm关闭）')
     parser.add_argument('--no-annual-ttm', action='store_true',
                        help='不生成年报+TTM数据')
     parser.add_argument('--years', type=int, default=None, 
                        help='年报年数（默认覆盖所有历史数据）')
+    parser.add_argument('--save-dividend-excel', action='store_true',
+                       help='将分红数据保存为Excel文件')
     
     args = parser.parse_args()
     
     # 规范化股票代码（自动补全交易所后缀）
     ts_code = normalize_stock_code(args.ts_code)
     
-    # 初始化客户端
-    print(f"初始化 Tushare 客户端...")
-    client = TushareClient(config_path=args.config)
+    # 初始化数据库管理器
+    print(f"连接数据库: {args.db_path}")
+    db_manager = FinancialDataManager(args.db_path)
     
-    # 获取财务数据
-    print(f"\n开始获取 {ts_code} 的财务数据...")
-    if args.start_date:
-        print(f"日期范围: {args.start_date} 至 {args.end_date or '至今'}")
+    # 检查数据完整性
+    print(f"\n检查 {ts_code} 的数据...")
+    data_exists = {}
+    for table in ['balancesheet', 'income', 'cashflow', 'fina_indicator']:
+        df = db_manager.get_financial_data(ts_code, table, args.start_date, args.end_date)
+        data_exists[table] = len(df) > 0
+        if len(df) > 0:
+            print(f"  ✓ {table}: {len(df)} 条记录")
+        else:
+            print(f"  ✗ {table}: 无数据")
+    
+    # 如果没有任何数据，提示用户
+    if not any(data_exists.values()):
+        print(f"\n❌ 错误：数据库中没有 {ts_code} 的财务数据")
+        print(f"\n请先运行以下命令采集数据:")
+        print(f"  python update_financial_data.py --init")
+        print(f"\n或者只采集单只股票:")
+        print(f"  # 修改 update_financial_data.py 中的股票列表")
+        return
+    
+    # 从数据库读取财务数据
+    print(f"\n从数据库读取 {ts_code} 的财务数据...")
+    data = {}
+    
+    for table_name in ['balancesheet', 'income', 'cashflow', 'fina_indicator']:
+        df = db_manager.get_financial_data(ts_code, table_name, args.start_date, args.end_date)
+        if len(df) > 0:
+            data[table_name] = df
+            print(f"  ✓ {table_name}: {len(df)} 条记录")
+    
+    # 注：总股本数据已从资产负债表中直接获取，不需要单独读取
+    
+    # 读取分红数据
+    print(f"\n读取分红送股数据...")
+    dividend_df = db_manager.get_dividend_data(ts_code, args.start_date, args.end_date)
+    if len(dividend_df) > 0:
+        print(f"  ✓ 分红数据: {len(dividend_df)} 条记录")
+        data['dividend'] = dividend_df
+        
+        # 如果用户要求，保存分红数据为Excel
+        if args.save_dividend_excel:
+            os.makedirs(args.output_dir, exist_ok=True)
+            excel_filename = os.path.join(args.output_dir, f"{ts_code}_分红送股.xlsx")
+            dividend_df.to_excel(excel_filename, index=False)
+            print(f"  ✓ 分红数据已保存到: {excel_filename}")
     else:
-        print(f"获取全部历史数据...")
+        print(f"  ⚠️  分红数据: 无数据")
     
-    # 默认翻译为中文
-    translate = not args.no_translate
-    if translate:
-        print(f"字段名翻译: 中文（默认）")
-    else:
-        print(f"字段名翻译: 英文")
-    
-    # 默认转置数据格式
-    transpose = not args.no_transpose
-    if transpose:
-        print(f"数据格式: 转置（字段纵向，时间横向）- 便于分析")
-    else:
-        print(f"数据格式: 原始（字段横向，时间纵向）")
-    
-    data = client.get_all_financial_data(
-        ts_code=ts_code,
-        start_date=args.start_date,
-        end_date=args.end_date,
-        translate=translate
-    )
-    
-    # 保存数据
-    print(f"\n保存数据到: {args.output_dir}")
-    if args.format in ['csv', 'both']:
-        client.save_to_csv(data, ts_code, args.output_dir, transpose=transpose)
-    
-    if args.format in ['excel', 'both']:
-        client.save_to_excel(data, ts_code, args.output_dir, transpose=transpose)
-    
-    # 获取总股本数据
-    print(f"\n获取总股本数据...")
-    total_share_data = None
-    try:
-        total_share_data = get_total_share_data(client, ts_code, data.get('balancesheet'))
-        if total_share_data:
-            print(f"✓ 成功获取 {len(total_share_data)} 个报告期的总股本数据")
-    except Exception as e:
-        print(f"⚠️  获取总股本数据失败: {e}")
-    
-    # 获取分红数据
-    print(f"\n获取分红送股数据...")
-    try:
-        dividend_df = get_dividend_data(client, ts_code, args.output_dir)
-        if dividend_df is not None:
-            print(f"✓ 成功获取分红送股数据，共 {len(dividend_df)} 条记录")
-            data['dividend'] = dividend_df
-    except Exception as e:
-        print(f"⚠️  获取分红送股数据失败: {e}")
+    # 创建输出目录
+    os.makedirs(args.output_dir, exist_ok=True)
     
     # 重构资产负债表
     if data.get('balancesheet') is not None and len(data['balancesheet']) > 0:
@@ -279,15 +210,10 @@ def main():
         try:
             # 获取原始资产负债表数据并转置
             df_balance = data['balancesheet'].copy()
-            df_transposed = client.transpose_data(df_balance)
+            df_transposed = transpose_data(df_balance)
             
-            # 重构资产负债表
+            # 重构资产负债表（总股本已包含在资产负债表的 data_json 中）
             df_restructured = restructure_balance_sheet(df_transposed)
-            
-            # 将总股本数据添加到重构的资产负债表中
-            if total_share_data:
-                df_restructured = add_total_share_to_balance(df_restructured, total_share_data)
-                print(f"✓ 总股本数据已添加到资产负债表")
             
             # 保存重构后的数据
             restructured_filename = os.path.join(args.output_dir, f"{ts_code}_balancesheet_restructured.csv")
@@ -309,21 +235,13 @@ def main():
     if data.get('income') is not None and len(data['income']) > 0:
         print(f"\n重构利润表（股权价值增加表）...")
         try:
-            # 读取配置文件获取股权资本成本率
-            equity_cost_rate = 0.08  # 默认值
-            try:
-                with open(args.config, 'r', encoding='utf-8') as f:
-                    config = yaml.safe_load(f)
-                    if config and 'restructure' in config:
-                        equity_cost_rate = config['restructure'].get('equity_cost_rate', 0.08)
-            except Exception as e:
-                print(f"  使用默认股权资本成本率: {equity_cost_rate*100}%")
-            
+            # 使用默认股权资本成本率
+            equity_cost_rate = 0.08  # 默认8%
             print(f"  股权资本成本率: {equity_cost_rate*100}%")
             
             # 获取原始利润表数据并转置
             df_income = data['income'].copy()
-            df_transposed = client.transpose_data(df_income)
+            df_transposed = transpose_data(df_income)
             
             # 获取资产负债表重构数据（用于获取所有者权益合计）
             balance_restructured = data.get('balancesheet_restructured')
@@ -357,12 +275,12 @@ def main():
         try:
             # 获取原始现金流量表数据并转置
             df_cashflow = data['cashflow'].copy()
-            df_transposed = client.transpose_data(df_cashflow)
+            df_transposed = transpose_data(df_cashflow)
             
             # 获取利润表原始数据并转置(用于营业收入、营业总成本)
             income_original = None
             if data.get('income') is not None:
-                income_original = client.transpose_data(data['income'].copy())
+                income_original = transpose_data(data['income'].copy())
             
             # 获取资产负债表重构数据(用于长期经营资产合计)
             balance_restructured = data.get('balancesheet_restructured')
@@ -416,8 +334,8 @@ def main():
                     # 获取所有日期列
                     date_cols = [col for col in balance_restructured.columns if col != '项目']
                     if date_cols:
-                        # 找到最早和最新的年份
-                        years_list = [int(col[:4]) for col in date_cols if len(col) >= 4 and col[:4].isdigit()]
+                        # 找到最早和最新的年份（将列名转为字符串）
+                        years_list = [int(str(col)[:4]) for col in date_cols if len(str(col)) >= 4 and str(col)[:4].isdigit()]
                         if years_list:
                             min_year = min(years_list)
                             max_year = max(years_list)
@@ -545,12 +463,6 @@ def main():
     print("="*60)
     
     try:
-        import pandas as pd
-        from financial_data_manager import FinancialDataManager
-        
-        # 初始化数据库管理器
-        db_manager = FinancialDataManager('database/financial_data.db')
-        
         # 获取三大报表数据
         balance_data = data.get('balancesheet')
         income_data = data.get('income')

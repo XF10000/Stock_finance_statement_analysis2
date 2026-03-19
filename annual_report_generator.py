@@ -93,8 +93,8 @@ class AnnualReportGenerator:
         
         for df in dfs:
             if df is not None and len(df) > 0:
-                # 获取非"项目"列
-                date_cols = [col for col in df.columns if col != '项目']
+                # 获取非"项目"列，并转换为字符串
+                date_cols = [str(col) for col in df.columns if col != '项目']
                 all_dates.update(date_cols)
         
         return sorted(list(all_dates))
@@ -150,8 +150,8 @@ class AnnualReportGenerator:
         # 构建结果DataFrame
         result_data = {}
         
-        # 获取所有可用的日期列（按降序排列）
-        all_date_cols = sorted([col for col in df.columns if col != '项目'], reverse=True)
+        # 获取所有可用的日期列（按降序排列，转换为字符串）
+        all_date_cols = sorted([str(col) for col in df.columns if col != '项目'], reverse=True)
         
         for _, row in df.iterrows():
             item_name = row['项目']

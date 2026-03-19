@@ -206,6 +206,30 @@ class FinancialDataManager:
                 )
             ''')
             
+            
+            # 表9: 分红送股数据
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS dividend (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts_code TEXT NOT NULL,
+                    end_date TEXT NOT NULL,
+                    ann_date TEXT,
+                    div_proc TEXT,
+                    stk_div REAL,
+                    stk_bo_rate REAL,
+                    stk_co_rate REAL,
+                    cash_div REAL,
+                    cash_div_tax REAL,
+                    record_date TEXT,
+                    ex_date TEXT,
+                    pay_date TEXT,
+                    div_listdate TEXT,
+                    imp_ann_date TEXT,
+                    update_time TEXT,
+                    UNIQUE(ts_code, end_date, ann_date)
+                )
+            ''')
+            
             # 创建索引以提高查询性能
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_balancesheet_ts_code ON balancesheet(ts_code)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_balancesheet_end_date ON balancesheet(end_date)')
@@ -218,6 +242,8 @@ class FinancialDataManager:
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_core_indicators_ts_code ON core_indicators(ts_code)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_core_indicators_end_date ON core_indicators(end_date)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_market_distribution_end_date ON market_distribution(end_date)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_dividend_ts_code ON dividend(ts_code)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_dividend_end_date ON dividend(end_date)')
             
             conn.commit()
             self.logger.info("数据库初始化完成")
@@ -363,6 +389,66 @@ class FinancialDataManager:
         except Exception as e:
             conn.rollback()
             self.logger.error(f"保存 {data_type} 数据失败 ({ts_code}, {end_date}): {e}")
+            raise
+    
+    def save_financial_data_batch(self, batch_data: List[Dict[str, Any]]):
+        """
+        批量保存财务数据（用于队列批量写入）
+        
+        Args:
+            batch_data: 批量数据列表，每项包含:
+                {
+                    'ts_code': str,
+                    'end_date': str,
+                    'data_type': str,  # 'balancesheet', 'income', 'cashflow', 'fina_indicator'
+                    'data': pd.DataFrame
+                }
+        """
+        if not batch_data:
+            return
+        
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # 按表分组
+            grouped_by_table = {}
+            for item in batch_data:
+                table = item['data_type']
+                if table not in grouped_by_table:
+                    grouped_by_table[table] = []
+                grouped_by_table[table].append(item)
+            
+            # 分表批量插入
+            for table_name, items in grouped_by_table.items():
+                if table_name not in ['balancesheet', 'income', 'cashflow', 'fina_indicator']:
+                    self.logger.warning(f"跳过不支持的数据类型: {table_name}")
+                    continue
+                
+                # 准备批量插入数据
+                insert_data = []
+                for item in items:
+                    data_json = item['data'].to_json(orient='records', force_ascii=False)
+                    insert_data.append((
+                        item['ts_code'],
+                        str(item['end_date']).replace('-', ''),
+                        data_json,
+                        datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    ))
+                
+                # 批量插入
+                cursor.executemany(f'''
+                    INSERT OR REPLACE INTO {table_name}
+                    (ts_code, end_date, data_json, update_time)
+                    VALUES (?, ?, ?, ?)
+                ''', insert_data)
+            
+            conn.commit()
+            self.logger.debug(f"批量保存 {len(batch_data)} 条财务数据成功")
+            
+        except Exception as e:
+            conn.rollback()
+            self.logger.error(f"批量保存财务数据失败: {e}")
             raise
     
     def get_financial_data(self, ts_code: str, data_type: str,
@@ -703,11 +789,206 @@ class FinancialDataManager:
         conn = self.get_connection()
         conn.execute('VACUUM')
         self.logger.info("数据库优化完成")
+    
+    # ========================================================================
+    # 总股本数据管理（从资产负债表提取）
+    # ========================================================================
+    
+    def get_total_share_from_balance(self, ts_code: str, end_date: str = None) -> Optional[float]:
+        """
+        从资产负债表中提取总股本数据
+        
+        Args:
+            ts_code: 股票代码
+            end_date: 报告期（YYYYMMDD格式字符串，可选，如果不指定则返回最新）
+            
+        Returns:
+            总股本（股），如果不存在则返回 None
+        """
+        balance_df = self.get_financial_data(ts_code, 'balancesheet')
+        
+        if balance_df is None or len(balance_df) == 0:
+            return None
+        
+        # 如果指定了报告期，筛选对应记录
+        if end_date:
+            date_col = '报告期' if '报告期' in balance_df.columns else 'end_date'
+            # 将字符串日期转为整数进行比较
+            end_date_int = int(end_date) if isinstance(end_date, str) else end_date
+            balance_df = balance_df[balance_df[date_col] == end_date_int]
+            
+            if len(balance_df) == 0:
+                return None
+        
+        # 从最新记录中提取总股本
+        if '期末总股本' in balance_df.columns:
+            total_share = balance_df['期末总股本'].iloc[-1]
+            return float(total_share) if pd.notna(total_share) else None
+        
+        return None
+    
+    # ========================================================================
+    # 分红送股数据管理
+    # ========================================================================
+    
+    def save_dividend_data(self, ts_code: str, dividend_df: pd.DataFrame):
+        """
+        保存分红送股数据
+        
+        Args:
+            ts_code: 股票代码
+            dividend_df: 分红数据DataFrame，支持中英文列名
+        """
+        if dividend_df is None or len(dividend_df) == 0:
+            self.logger.debug(f"没有分红数据需要保存: {ts_code}")
+            return
+        
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        # 字段映射（中文->英文）
+        field_mapping = {
+            '报告期': 'end_date',
+            '公告日期': 'ann_date',
+            '分红进度': 'div_proc',
+            '送股比例': 'stk_div',
+            '转增比例': 'stk_bo_rate',
+            '配股比例': 'stk_co_rate',
+            '每股派息(税前)': 'cash_div',
+            '每股派息(税后)': 'cash_div_tax',
+            '股权登记日': 'record_date',
+            '除权除息日': 'ex_date',
+            '派息日': 'pay_date',
+            '红股上市日': 'div_listdate',
+            '实施公告日': 'imp_ann_date'
+        }
+        
+        # 复制数据并重命名列
+        df = dividend_df.copy()
+        for cn_name, en_name in field_mapping.items():
+            if cn_name in df.columns:
+                df = df.rename(columns={cn_name: en_name})
+        
+        try:
+            update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            for _, row in df.iterrows():
+                cursor.execute('''
+                    INSERT OR REPLACE INTO dividend
+                    (ts_code, end_date, ann_date, div_proc, stk_div, stk_bo_rate, 
+                     stk_co_rate, cash_div, cash_div_tax, record_date, ex_date, 
+                     pay_date, div_listdate, imp_ann_date, update_time)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    ts_code,
+                    str(row.get('end_date', '')),
+                    str(row.get('ann_date', '')) if pd.notna(row.get('ann_date')) else None,
+                    str(row.get('div_proc', '')) if pd.notna(row.get('div_proc')) else None,
+                    float(row.get('stk_div')) if pd.notna(row.get('stk_div')) else None,
+                    float(row.get('stk_bo_rate')) if pd.notna(row.get('stk_bo_rate')) else None,
+                    float(row.get('stk_co_rate')) if pd.notna(row.get('stk_co_rate')) else None,
+                    float(row.get('cash_div')) if pd.notna(row.get('cash_div')) else None,
+                    float(row.get('cash_div_tax')) if pd.notna(row.get('cash_div_tax')) else None,
+                    str(row.get('record_date', '')) if pd.notna(row.get('record_date')) else None,
+                    str(row.get('ex_date', '')) if pd.notna(row.get('ex_date')) else None,
+                    str(row.get('pay_date', '')) if pd.notna(row.get('pay_date')) else None,
+                    str(row.get('div_listdate', '')) if pd.notna(row.get('div_listdate')) else None,
+                    str(row.get('imp_ann_date', '')) if pd.notna(row.get('imp_ann_date')) else None,
+                    update_time
+                ))
+            
+            conn.commit()
+            self.logger.debug(f"保存分红数据: {ts_code} {len(df)} 条")
+            
+        except Exception as e:
+            conn.rollback()
+            self.logger.error(f"保存分红数据失败 ({ts_code}): {e}")
+            raise
+    
+    def get_dividend_data(self, ts_code: str, 
+                         start_date: str = None, 
+                         end_date: str = None) -> pd.DataFrame:
+        """
+        获取分红送股数据
+        
+        Args:
+            ts_code: 股票代码
+            start_date: 开始日期（可选）
+            end_date: 结束日期（可选）
+            
+        Returns:
+            分红数据DataFrame
+        """
+        conn = self.get_connection()
+        
+        query = '''
+            SELECT end_date, ann_date, div_proc, stk_div, stk_bo_rate, 
+                   stk_co_rate, cash_div, cash_div_tax, record_date, 
+                   ex_date, pay_date, div_listdate, imp_ann_date
+            FROM dividend 
+            WHERE ts_code = ?
+        '''
+        params = [ts_code]
+        
+        if start_date:
+            query += ' AND end_date >= ?'
+            params.append(start_date)
+        
+        if end_date:
+            query += ' AND end_date <= ?'
+            params.append(end_date)
+        
+        query += ' ORDER BY end_date DESC, ann_date DESC'
+        
+        df = pd.read_sql_query(query, conn, params=params)
+        
+        # 重命名为中文列名（保持与原有代码一致）
+        df = df.rename(columns={
+            'end_date': '报告期',
+            'ann_date': '公告日期',
+            'div_proc': '分红进度',
+            'stk_div': '送股比例',
+            'stk_bo_rate': '转增比例',
+            'stk_co_rate': '配股比例',
+            'cash_div': '每股派息(税前)',
+            'cash_div_tax': '每股派息(税后)',
+            'record_date': '股权登记日',
+            'ex_date': '除权除息日',
+            'pay_date': '派息日',
+            'div_listdate': '红股上市日',
+            'imp_ann_date': '实施公告日'
+        })
+        
+        return df
+    
+    def check_dividend_exists(self, ts_code: str, end_date: str = None) -> bool:
+        """
+        检查分红数据是否存在
+        
+        Args:
+            ts_code: 股票代码
+            end_date: 报告期（可选，不指定则检查是否有任何分红记录）
+            
+        Returns:
+            是否存在
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        if end_date:
+            cursor.execute('''
+                SELECT COUNT(*) FROM dividend 
+                WHERE ts_code = ? AND end_date = ?
+            ''', (ts_code, end_date))
+        else:
+            cursor.execute('''
+                SELECT COUNT(*) FROM dividend 
+                WHERE ts_code = ?
+            ''', (ts_code,))
+        
+        count = cursor.fetchone()[0]
+        return count > 0
 
-
-# ============================================================================
-# 测试代码
-# ============================================================================
 
 if __name__ == '__main__':
     import logging

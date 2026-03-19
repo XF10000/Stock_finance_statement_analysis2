@@ -2063,37 +2063,41 @@ class HTMLReportGenerator:
         return chart
     
     def _get_dividend_data(self, date_columns: List[str]) -> List:
-        """从分红送股文件读取分红数据"""
+        """从数据库读取分红数据"""
         import os
-        
-        # 读取分红送股.xlsx文件
-        dividend_file = f'data/{self.stock_code}_分红送股.xlsx'
-        
-        if not os.path.exists(dividend_file):
-            print(f"警告: 未找到分红送股文件: {dividend_file}")
-            return [None] * len(date_columns)
+        from financial_data_manager import FinancialDataManager
         
         try:
-            df = pd.read_excel(dividend_file)
+            # 从数据库读取分红数据
+            db_manager = FinancialDataManager('database/financial_data.db')
+            df = db_manager.get_dividend_data(self.stock_code)
             
             if df is None or len(df) == 0:
                 return [None] * len(date_columns)
             
-            # 处理列名
+            # 确保列名正确
             if '报告期' in df.columns:
                 df['end_date'] = df['报告期']
+            elif 'end_date' not in df.columns:
+                return [None] * len(date_columns)
+            
+            # 确保有分红金额列
             if '每股派息(税后)' in df.columns:
                 df['cash_div_tax'] = df['每股派息(税后)']
             if '每股派息(税前)' in df.columns:
                 df['cash_div'] = df['每股派息(税前)']
             
             # 转换日期格式
-            df['end_date'] = pd.to_datetime(df['end_date'], format='%Y%m%d').dt.strftime('%Y%m%d')
+            df['end_date'] = df['end_date'].astype(str)
             df['year'] = df['end_date'].str[:4]
             df['month'] = df['end_date'].str[4:6]
             
             # 优先使用cash_div_tax，其次cash_div
-            df['dividend'] = df.apply(lambda row: row['cash_div_tax'] if pd.notna(row['cash_div_tax']) and row['cash_div_tax'] > 0 else (row['cash_div'] if pd.notna(row['cash_div']) else 0), axis=1)
+            df['dividend'] = df.apply(
+                lambda row: row.get('cash_div_tax', 0) if pd.notna(row.get('cash_div_tax')) and row.get('cash_div_tax', 0) > 0 
+                else (row.get('cash_div', 0) if pd.notna(row.get('cash_div')) else 0), 
+                axis=1
+            )
             
             # 去除重复记录
             df = df.sort_values('dividend', ascending=False).drop_duplicates(subset=['end_date'], keep='first')
