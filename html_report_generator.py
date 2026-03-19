@@ -1899,11 +1899,11 @@ class HTMLReportGenerator:
             else:
                 资本支出总额_data.append(None)
             
-            # 4. 营运资本变化量
+            # 4. 营运资本变化量（当期 - 上期，日期列是倒序的，所以上期是 i+1）
             current_wc = 周转性经营投入_row[col].values[0] if len(周转性经营投入_row) > 0 else 0
             if i < len(date_columns) - 1:
-                next_col = date_columns[i+1]
-                prev_wc = 周转性经营投入_row[next_col].values[0] if len(周转性经营投入_row) > 0 else 0
+                prev_col = date_columns[i+1]
+                prev_wc = 周转性经营投入_row[prev_col].values[0] if len(周转性经营投入_row) > 0 else 0
                 if pd.notna(current_wc) and pd.notna(prev_wc):
                     wc_change = float(current_wc) - float(prev_wc)
                     营运资本变化量_data.append(round(wc_change / 1e8, 0))
@@ -2009,10 +2009,10 @@ class HTMLReportGenerator:
             # 3. 资本支出总额
             capex = 资本支出总额_row[col].values[0] if len(资本支出总额_row) > 0 else 0
             
-            # 4. 营运资本变化量（当期 - 上期）
+            # 4. 营运资本变化量（当期 - 上期，日期列是倒序的，所以上期是 i+1）
             current_wc = 周转性经营投入_row[col].values[0] if len(周转性经营投入_row) > 0 else 0
-            if i > 0:
-                prev_col = date_columns[i-1]
+            if i < len(date_columns) - 1:
+                prev_col = date_columns[i+1]
                 prev_wc = 周转性经营投入_row[prev_col].values[0] if len(周转性经营投入_row) > 0 else 0
                 if pd.notna(current_wc) and pd.notna(prev_wc):
                     wc_change = float(current_wc) - float(prev_wc)
@@ -2021,10 +2021,10 @@ class HTMLReportGenerator:
             else:
                 wc_change = 0
             
-            # 5. 债务变化（当期 - 上期）
+            # 5. 债务变化（当期 - 上期，日期列是倒序的，所以上期是 i+1）
             current_debt = 有息债务_row[col].values[0] if len(有息债务_row) > 0 else 0
-            if i > 0:
-                prev_col = date_columns[i-1]
+            if i < len(date_columns) - 1:
+                prev_col = date_columns[i+1]
                 prev_debt = 有息债务_row[prev_col].values[0] if len(有息债务_row) > 0 else 0
                 if pd.notna(current_debt) and pd.notna(prev_debt):
                     debt_change = float(current_debt) - float(prev_debt)
