@@ -2011,9 +2011,9 @@ class HTMLReportGenerator:
             
             # 4. 营运资本变化量（当期 - 上期）
             current_wc = 周转性经营投入_row[col].values[0] if len(周转性经营投入_row) > 0 else 0
-            if i < len(date_columns) - 1:
-                next_col = date_columns[i+1]
-                prev_wc = 周转性经营投入_row[next_col].values[0] if len(周转性经营投入_row) > 0 else 0
+            if i > 0:
+                prev_col = date_columns[i-1]
+                prev_wc = 周转性经营投入_row[prev_col].values[0] if len(周转性经营投入_row) > 0 else 0
                 if pd.notna(current_wc) and pd.notna(prev_wc):
                     wc_change = float(current_wc) - float(prev_wc)
                 else:
@@ -2023,9 +2023,9 @@ class HTMLReportGenerator:
             
             # 5. 债务变化（当期 - 上期）
             current_debt = 有息债务_row[col].values[0] if len(有息债务_row) > 0 else 0
-            if i < len(date_columns) - 1:
-                next_col = date_columns[i+1]
-                prev_debt = 有息债务_row[next_col].values[0] if len(有息债务_row) > 0 else 0
+            if i > 0:
+                prev_col = date_columns[i-1]
+                prev_debt = 有息债务_row[prev_col].values[0] if len(有息债务_row) > 0 else 0
                 if pd.notna(current_debt) and pd.notna(prev_debt):
                     debt_change = float(current_debt) - float(prev_debt)
                 else:
