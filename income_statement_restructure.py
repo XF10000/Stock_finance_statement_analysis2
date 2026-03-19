@@ -281,28 +281,23 @@ def restructure_income_statement(df: pd.DataFrame,
     logger.info("计算所得税...")
     
     income_tax = _safe_get_value(df_data, '所得税费用', date_columns)
-    profit_before_tax = _safe_get_value(df_data, '利润总额', date_columns)
+    profit_before_tax_raw = _safe_get_value(df_data, '利润总额', date_columns)
     
     # 长期股权投资收益（通常适用不同税率）
     invest_income = _safe_get_value(df_data, '投资收益', date_columns)
     joint_invest_income = _safe_get_value(df_data, '对联营企业投资收益', date_columns)
     long_term_equity_income = joint_invest_income  # 对联营企业投资收益视为长期股权投资收益
     
-    # 计算实际所得税税率
-    # 实际所得税税率 = 所得税费用 / (税前利润 - 长期股权投资收益)
-    taxable_profit = profit_before_tax - long_term_equity_income
-    effective_tax_rate = income_tax / taxable_profit.replace(0, np.nan)
-    # 处理异常值（如负税率）
-    effective_tax_rate = effective_tax_rate.clip(lower=0, upper=1)
-    restructured_data['实际所得税税率'] = effective_tax_rate
+    # 计算临时的实际所得税税率（用于金融资产收益和财务费用的税务计算）
+    # 注意：这是基于原始利润总额的临时税率，最终会在税前利润重构后重新计算
+    taxable_profit_temp = profit_before_tax_raw - long_term_equity_income
+    effective_tax_rate_temp = income_tax / taxable_profit_temp.replace(0, np.nan)
+    effective_tax_rate_temp = effective_tax_rate_temp.clip(lower=0, upper=1)
     
-    # 经营利润所得税 = 息税前经营利润 × 实际所得税税率
-    operating_tax = ebit_operating * effective_tax_rate
-    restructured_data['经营利润所得税'] = operating_tax
-    
-    # 息前税后经营利润
-    nopat_operating = ebit_operating - operating_tax
-    restructured_data['息前税后经营利润'] = nopat_operating
+    # 计算临时的经营利润所得税和息前税后经营利润（用于息前税后利润总额计算）
+    # 注意：这些是临时值，最终会在税前利润重构后重新计算
+    operating_tax_temp = ebit_operating * effective_tax_rate_temp
+    nopat_operating_temp = ebit_operating - operating_tax_temp
     
     # ========================================================================
     # 6. 投资收益分析
@@ -342,8 +337,8 @@ def restructure_income_statement(df: pd.DataFrame,
                         + fair_value_change + exchange_income + other_comprehensive_income)
     restructured_data['息税前金融资产收益'] = financial_income
     
-    # 金融资产收益所得税
-    financial_tax = financial_income * effective_tax_rate
+    # 金融资产收益所得税（使用临时税率）
+    financial_tax = financial_income * effective_tax_rate_temp
     restructured_data['金融资产收益所得税'] = financial_tax
     
     # 息前税后金融资产收益
@@ -382,8 +377,9 @@ def restructure_income_statement(df: pd.DataFrame,
     # ========================================================================
     logger.info("计算息前税后利润总额...")
     
-    # 息前税后利润总额 = 息前税后经营利润 + 息前税后金融资产收益
-    nopat_total = nopat_operating + nopat_financial
+    # 息前税后利润总额 = 息前税后经营利润 + 息前税后金融资产收益（使用临时值）
+    # 注意：这是临时计算，最终会在税前利润重构后重新计算
+    nopat_total = nopat_operating_temp + nopat_financial
     restructured_data['息前税后利润总额'] = nopat_total
     
     # ========================================================================
@@ -403,8 +399,8 @@ def restructure_income_statement(df: pd.DataFrame,
 
     restructured_data['(其中)利息费用'] = interest_expense
 
-    # 财务费用抵税效应 = 真实财务费用 × 实际所得税税率
-    financial_tax_shield = real_financial_expense * effective_tax_rate
+    # 财务费用抵税效应 = 真实财务费用 × 实际所得税税率（使用临时税率）
+    financial_tax_shield = real_financial_expense * effective_tax_rate_temp
     restructured_data['财务费用抵税效应'] = financial_tax_shield
 
     # 税后真实财务费用
@@ -421,6 +417,20 @@ def restructure_income_statement(df: pd.DataFrame,
     restructured_data['税前利润'] = profit_before_tax_calc
     
     restructured_data['减：所得税费用'] = income_tax
+    
+    # 重新计算实际所得税税率（使用重构后的税前利润）
+    # 实际所得税税率 = 所得税费用 / (税前利润 - 长期股权投资收益)
+    taxable_profit_recalc = profit_before_tax_calc - long_term_equity_income
+    effective_tax_rate_recalc = income_tax / taxable_profit_recalc.replace(0, np.nan)
+    effective_tax_rate_recalc = effective_tax_rate_recalc.clip(lower=0, upper=1)
+    restructured_data['实际所得税税率'] = effective_tax_rate_recalc
+    
+    # 重新计算经营利润所得税和息前税后经营利润（使用正确的实际所得税税率）
+    operating_tax_recalc = ebit_operating * effective_tax_rate_recalc
+    restructured_data['经营利润所得税'] = operating_tax_recalc
+    
+    nopat_operating_recalc = ebit_operating - operating_tax_recalc
+    restructured_data['息前税后经营利润'] = nopat_operating_recalc
     
     # 按文档公式：净利润 = 税前利润 - 所得税费用
     net_profit = profit_before_tax_calc - income_tax
