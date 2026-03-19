@@ -271,6 +271,10 @@ def restructure_income_statement(df: pd.DataFrame,
                       + asset_dispose_income + other_income + nonoper_income - nonoper_expense)
     restructured_data['息税前经营利润'] = ebit_operating
     
+    # 息税前经营利润率 = 息税前经营利润 / 营业收入
+    ebit_operating_margin = ebit_operating / revenue.replace(0, np.nan)
+    restructured_data['息税前经营利润率'] = ebit_operating_margin
+    
     # ========================================================================
     # 5. 所得税计算
     # ========================================================================
@@ -478,6 +482,7 @@ def restructure_income_statement(df: pd.DataFrame,
         '减：营业外支出',
         '营业外收支及其他占营业收入的比例',
         '息税前经营利润',
+        '息税前经营利润率',
         '经营利润所得税',
         '息前税后经营利润',
         '投资收益',

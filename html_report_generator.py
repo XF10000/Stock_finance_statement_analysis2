@@ -198,18 +198,18 @@ class HTMLReportGenerator:
             'title': '息税前经营收入利润EBIT、利润率',
             'type': 'bar_line',
             'data': self._extract_chart_data(df, date_columns, {
-                'bar': ['营业收入', '息前税后经营利润'],
-                'line': ['息前税后经营利润率']
+                'bar': ['营业收入', '息税前经营利润'],
+                'line': ['息税前经营利润率']
             }),
             'colors': {
                 '营业收入': self.COLORS['blue'],
-                '息前税后经营利润': self.COLORS['orange'],
-                '息前税后经营利润率': self.COLORS['gray']
+                '息税前经营利润': self.COLORS['orange'],
+                '息税前经营利润率': self.COLORS['gray']
             },
             'y_axis_names': ['亿元', ''],
             'line_format': 'percent',
             'calculated_fields': {
-                '息前税后经营利润率': ('息前税后经营利润', '营业收入')
+                '息税前经营利润率': ('息税前经营利润', '营业收入')
             }
         }
         charts.append(chart2)
@@ -1337,7 +1337,7 @@ class HTMLReportGenerator:
         # 判断字段是否为比率字段（需要乘以100）
         ratio_fields = ['毛利率', '净利润率', '营业成本率', '销售费用率', '管理费用率', '研发费用率', 
                        '营业税金及附加率', '资产减值损失率', '有息债务率', 
-                       '息前税后经营利润率', '自由现金流/营业收入', '营业费用率',
+                       '息前税后经营利润率', '息税前经营利润率', '自由现金流/营业收入', '营业费用率',
                        '税金及附加率', '经营资产减值损失率', '营业外收支净额率', '总费用率']
         
         for chart_type, fields in series_config.items():
