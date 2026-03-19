@@ -19,10 +19,10 @@ python3 main.py 603345
 - ✅ 利润表重构（股权价值增加表）
 - ✅ 现金流量表重构
 
-#### 2️⃣ 年度财务报表+TTM（覆盖所有历史）
-- ✅ 年度资产负债表+TTM
-- ✅ 年度利润表+TTM
-- ✅ 年度现金流量表+TTM
+#### 2️⃣ 年度重构财务报表+TTM（覆盖所有历史）
+- ✅ 基于重构资产负债表汇总的年度资产负债表+TTM
+- ✅ 基于重构利润表汇总的年度利润表+TTM
+- ✅ 基于重构现金流量表汇总的年度现金流量表+TTM
 
 #### 3️⃣ HTML交互式财务分析报告
 - ✅ 利润分析图表
@@ -55,6 +55,8 @@ data/
 ├── 603345.SH_balance_sheet_annual_ttm.csv       # 年报+TTM资产负债表
 ├── 603345.SH_income_statement_annual_ttm.csv    # 年报+TTM利润表
 ├── 603345.SH_cashflow_statement_annual_ttm.csv  # 年报+TTM现金流量表
+├── 603345.SH_核心指标_YYYYMMDD_HHmmss.csv        # 核心指标明细数据
+├── 603345.SH_核心指标_YYYYMMDD_HHmmss.html       # 核心指标分析报告
 └── 603345.SH_financial_report.html              # HTML财务分析报告 ⭐
 ```
 
@@ -73,16 +75,18 @@ open ./data/603345.SH_financial_report.html
 ```
 开始
   ↓
-1. 从Tushare获取原始财务数据
+1. 连接本地 financial_data.db 并加载最新财务/分红数据
   ↓
-2. 重构三大报表（按文档规则）
+2. 基于数据库数据重构三大报表（季度级）
   ↓
-3. 生成年报+TTM数据（覆盖所有历史）
+3. 基于重构结果生成年度+TTM报表（覆盖所有历史）
   ↓
-4. 生成HTML交互式报告
+4. 生成HTML财务分析报告 & 核心指标报告
   ↓
 完成！
 ```
+
+> 📌 数据库数据由独立的更新脚本维护（参见 `update_financial_data.py` 等），运行 `python3 main.py <ts_code>` 时无需重新拉取 Tushare 数据。
 
 ## 执行时间
 
@@ -180,20 +184,18 @@ python update_financial_data.py --update-stock-dividend 000333
 
 | 命令 | 用途 | 耗时 |
 |------|------|------|
-| `--init` | 首次初始化全A股数据 | 2-3小时 |
-| `--update-latest` | 增量更新最新季度 | 30-40分钟 |
-| `--update-stock 000001` | 更新单只股票 | <1分钟 |
-| `--update-stock-dividend 000333` | 更新单只股票分红 | <10秒 |
-| `--update-dividend` | 更新所有股票分红 | 20-30分钟 |
-| `--recalculate-all` | 重算核心指标 | 10-15分钟 |
+| `python update_financial_data.py --init` | 首次初始化全A股数据 | 2-3小时 |
+| `python update_financial_data.py --update-latest` | 增量更新最新季度 | 30-40分钟 |
+| `python update_financial_data.py --update-stock 000001` | 更新单只股票 | <1分钟 |
+| `python update_financial_data.py --update-stock-dividend 000333` | 更新单只股票分红 | <10秒 |
+| `python update_financial_data.py --update-dividend` | 更新所有股票分红 | 20-30分钟 |
+| `python update_financial_data.py --recalculate-all` | 重算核心指标 | 10-15分钟 |
 
 ### 报告生成命令
 
 | 命令 | 用途 | 输出 |
 |------|------|------|
-| `python main.py 000333` | 生成完整分析报告 | HTML + CSV |
-| `python fcff_report_generator.py 000333` | 生成FCFF报告 | HTML |
-| `python summary_excel_generator.py` | 生成Excel汇总 | Excel |
+| `python main.py 000333` | 生成完整分析报告 | 重构报表(CSV) + 年报+TTM(CSV) + 财务分析报告(HTML) + 核心指标报告(HTML+CSV) |
 
 ---
 
@@ -309,8 +311,8 @@ python update_financial_data.py --update-latest --no-indicators
 
 ## ⚠️ 注意事项
 
-1. **API限流**：Tushare限制150次/分钟，系统已自动处理
-2. **磁盘空间**：确保有至少2GB可用空间
+1. **API限流**：Tushare限制200次/分钟，系统已自动处理
+2. **磁盘空间**：确保有至少5GB可用空间
 3. **网络连接**：初始化需要稳定的网络连接
 4. **数据备份**：建议定期备份 `database/` 目录
 
