@@ -1160,6 +1160,7 @@ class FinancialDataUpdater:
                     None,
                     None,
                     1,  # data_complete
+                    0,  # is_ttm (年报指标，非TTM)
                     datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 ))
             
@@ -1173,8 +1174,8 @@ class FinancialDataUpdater:
                     ar_turnover_log_percentile, gross_margin_percentile,
                     lta_turnover_log_percentile, working_capital_ratio_percentile,
                     ocf_ratio_percentile,
-                    data_complete, update_time
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    data_complete, is_ttm, update_time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', insert_data)
             
             conn.commit()
@@ -1284,9 +1285,13 @@ class FinancialDataUpdater:
                 date_col = '报告期' if '报告期' in balance.columns else 'end_date'
                 all_quarters = sorted([str(q).replace('-', '') for q in balance[date_col].unique()])
                 
-                # 为每个季度生成 TTM 指标
+                # 为每个季度生成 TTM 指标（跳过年报季度）
                 for quarter in all_quarters:
                     try:
+                        # 年报季度（1231）不需要计算 TTM，因为年报本身就是完整年度数据
+                        if quarter.endswith('1231'):
+                            continue
+                        
                         # 生成 TTM 财务数据
                         ttm_data = generator.generate_ttm_data(
                             balance, income, cashflow, quarter
