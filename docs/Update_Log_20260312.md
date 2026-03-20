@@ -311,5 +311,4 @@ for report_name, df_report in reports.items():
 ## 参考资料
 
 - 《财务报表分析与股票估值》（郭永清著）
-- 《手把手教你读财报》（唐朝著）
 - Tushare财务数据接口文档
