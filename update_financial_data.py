@@ -837,6 +837,12 @@ class FinancialDataUpdater:
             
             self.calculate_core_indicators_batch(target_quarter)
             self.calculate_ttm_indicators_batch(target_quarter=target_quarter)
+            
+            # 更新分红数据（只更新缺失的股票）
+            self.logger.info("\n" + "="*60)
+            self.logger.info("更新分红数据...")
+            self.logger.info("="*60)
+            self.update_dividend_and_totalshares()
     
     def update_dividend_and_totalshares(self):
         """
@@ -1653,6 +1659,19 @@ def main():
                         logger.info("✓ TTM 核心指标计算完成")
                     except Exception as e:
                         logger.error(f"计算 TTM 核心指标失败: {e}")
+                    
+                    # 更新分红数据
+                    try:
+                        logger.info(f"\n更新 {args.update_stock} 分红数据...")
+                        client = TushareClient(config_path=args.config)
+                        dividend_df = updater.fetch_dividend_data(client, args.update_stock)
+                        if dividend_df is not None and len(dividend_df) > 0:
+                            updater.db_manager.save_dividend_data(args.update_stock, dividend_df)
+                            logger.info(f"✓ 分红数据更新完成，共 {len(dividend_df)} 条记录")
+                        else:
+                            logger.info("✓ 无新的分红数据需要更新")
+                    except Exception as e:
+                        logger.warning(f"更新分红数据失败: {e}")
             else:
                 logger.error(f"\n✗ {args.update_stock} 最新季度数据更新失败")
         
