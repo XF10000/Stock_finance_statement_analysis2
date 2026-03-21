@@ -450,9 +450,9 @@ class CoreIndicatorsAnalyzer:
         计算指标2：再投资质量暨跑冒滴漏风险检验
         - 长期经营资产周转率对数
         
-        长期经营资产 = 固定资产 + 在建工程 + 生产性生物资产 + 公益性生物资产 
-                    + 油气资产 + 使用权资产 + 无形资产 + 开发支出 
-                    + 商誉 + 长期待摊费用 + 其他非流动资产
+        长期经营资产 = 固定资产 + 在建工程 + 生产性生物资产 + 公益性生物资产
+                    + 油气资产 + 使用权资产 + 无形资产 + 开发支出
+                    + 商誉 + 长期待摊费用 + 其他非流动资产（共 11 项）
         
         注意：balance_last_year是去年同期数据，用于计算平均长期资产
         """
@@ -464,6 +464,7 @@ class CoreIndicatorsAnalyzer:
                 ('固定资产', 'fix_assets'),
                 ('在建工程', 'cip'),
                 ('生产性生物资产', 'produc_bio_assets'),
+                ('公益性生物资产', 'public_welfare_bio_assets'),
                 ('油气资产', 'oil_and_gas_assets'),
                 ('使用权资产', 'use_right_assets'),
                 ('无形资产', 'intan_assets'),

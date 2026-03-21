@@ -394,6 +394,7 @@ def recalculate_lta_after_reclassification(
         '固定资产':       'fix_assets',
         '在建工程':       'cip',
         '生产性生物资产': 'produc_bio_assets',
+        '公益性生物资产': 'public_welfare_bio_assets',
         '油气资产':       'oil_and_gas_assets',
         '使用权资产':     'use_right_assets',
         '无形资产':       'intan_assets',
