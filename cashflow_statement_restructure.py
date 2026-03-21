@@ -137,8 +137,9 @@ def restructure_cashflow_statement(
     # 标准化字段名
     df_data = _standardize_cashflow_field_names(df_data)
     
-    # 获取所有日期列
-    date_columns = df_data.columns.tolist()
+    # 获取所有日期列（统一转为字符串，避免 int/str 混用导致匹配失败）
+    date_columns = [str(c) for c in df_data.columns.tolist()]
+    df_data.columns = date_columns
     
     # 创建重构后的数据结构
     restructured_data = {}
@@ -163,6 +164,8 @@ def restructure_cashflow_statement(
         # 判断利润表数据格式并转置
         if '字段名' in income_data.columns:
             income_df = income_data.set_index('字段名')
+        elif '项目' in income_data.columns:
+            income_df = income_data.set_index('项目')
         elif '报告期' in income_data.columns or 'end_date' in income_data.columns:
             date_col = '报告期' if '报告期' in income_data.columns else 'end_date'
             non_numeric_cols = ['TS代码', 'ts_code', '公告日期', 'ann_date', '实际公告日期', 'f_ann_date',
@@ -177,6 +180,8 @@ def restructure_cashflow_statement(
             income_df = None
         
         if income_df is not None:
+            # 列名统一转字符串，与 date_columns 类型保持一致
+            income_df.columns = income_df.columns.astype(str)
             for col in date_columns:
                 if col in income_df.columns:
                     # 获取营业收入
@@ -264,8 +269,10 @@ def restructure_cashflow_statement(
     
     # 从利润表获取资产处置收益(作为处置长期资产损失的补充)
     # 注意:现金流量表中的"处置长期资产损失"字段通常为空,需要从利润表获取
-    if income_data is not None and '字段名' in income_data.columns:
-        income_df = income_data.set_index('字段名')
+    if income_data is not None and ('字段名' in income_data.columns or '项目' in income_data.columns):
+        _field_col = '字段名' if '字段名' in income_data.columns else '项目'
+        income_df = income_data.set_index(_field_col)
+        income_df.columns = income_df.columns.astype(str)
         for col in date_columns:
             if col in income_df.columns:
                 # 资产处置收益(负数为损失)
@@ -486,6 +493,8 @@ def restructure_cashflow_statement(
         # 判断利润表数据格式并转置（与营业总成本获取逻辑相同）
         if '字段名' in income_data.columns:
             income_df_for_interest = income_data.set_index('字段名')
+        elif '项目' in income_data.columns:
+            income_df_for_interest = income_data.set_index('项目')
         elif '报告期' in income_data.columns or 'end_date' in income_data.columns:
             date_col = '报告期' if '报告期' in income_data.columns else 'end_date'
             non_numeric_cols = ['TS代码', 'ts_code', '公告日期', 'ann_date', '实际公告日期', 'f_ann_date',
@@ -498,6 +507,9 @@ def restructure_cashflow_statement(
             income_df_for_interest.index.name = '字段名'
         else:
             income_df_for_interest = None
+        
+        if income_df_for_interest is not None:
+            income_df_for_interest.columns = income_df_for_interest.columns.astype(str)
         
         if income_df_for_interest is not None:
             for col in date_columns:

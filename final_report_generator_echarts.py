@@ -3,6 +3,7 @@
 支持时间轴同步缩放、默认显示最近10年、CSV导出
 """
 
+import math
 import pandas as pd
 import json
 from datetime import datetime
@@ -508,6 +509,40 @@ class FinalReportGenerator:
             margin-bottom: 12px;
             color: #444;
         }}
+        .chart-title-row {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 20px 0 4px;
+        }}
+        .chart-title-row h3 {{
+            margin: 0;
+        }}
+        .btn-label-toggle {{
+            padding: 4px 14px;
+            border: 1px solid #aaa;
+            border-radius: 4px;
+            background: white;
+            color: #666;
+            font-size: 13px;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }}
+        .btn-label-toggle.active {{
+            background: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+        }}
+        .btn-label-toggle:hover {{
+            border-color: #4CAF50;
+            color: #4CAF50;
+        }}
+        .btn-label-toggle.active:hover {{
+            opacity: 0.85;
+            color: white;
+        }}
     </style>
 </head>
 <body>
@@ -549,6 +584,21 @@ class FinalReportGenerator:
             chart.group = 'coreIndicatorsGroup';
         }});
         
+        // 每图独立数据标签开关
+        function toggleChartLabels(chartInstance, btn) {{
+            var visible = btn.dataset.visible === 'true';
+            visible = !visible;
+            btn.dataset.visible = visible;
+            var seriesCount = chartInstance.getOption().series.length;
+            var patches = [];
+            for (var i = 0; i < seriesCount; i++) {{
+                patches.push({{ label: {{ show: visible }} }});
+            }}
+            chartInstance.setOption({{ series: patches }});
+            btn.textContent = visible ? '隐藏数据标签' : '显示数据标签';
+            btn.classList.toggle('active', visible);
+        }}
+        
         // 响应式调整
         window.addEventListener('resize', function() {{
             allCharts.forEach(function(chart) {{
@@ -575,6 +625,34 @@ class FinalReportGenerator:
         elif chart_type == 'percentile':
             return self._generate_percentile_script(chart_data)
     
+    def _label_formatter_js(self, unit):
+        """Return a JS formatter function string for data labels based on metric unit"""
+        if unit == '%':
+            return "function(p){return p.value!=null?p.value.toFixed(1)+'%':''}"
+        elif unit in ('ln(次)', 'ln(次)'):
+            return "function(p){return p.value!=null?p.value.toFixed(2):''}"
+        else:
+            return "function(p){return p.value!=null?(Math.abs(p.value)>=100?p.value.toFixed(0):p.value.toFixed(2)):''}" 
+    
+    def _calc_percent_axis_range(self, values, min_display_range=20):
+        """为百分比指标计算合理的 Y 轴 min/max，避免微小波动视觉上被放大"""
+        valid = [v for v in values if v is not None and v == v]  # 过滤 None/NaN
+        if not valid:
+            return {'scale': True}
+        actual_min = min(valid)
+        actual_max = max(valid)
+        data_range = max(actual_max - actual_min, 1)
+        padding = max(data_range * 1.5, min_display_range / 2)
+        raw_min = actual_min - padding
+        raw_max = actual_max + padding
+        axis_min = max(0.0, math.floor(raw_min / 5) * 5)
+        axis_max = min(100.0, math.ceil(raw_max / 5) * 5)
+        if axis_max - axis_min < min_display_range:
+            mid = (actual_min + actual_max) / 2
+            axis_min = max(0.0, math.floor((mid - min_display_range / 2) / 5) * 5)
+            axis_max = min(100.0, math.ceil((mid + min_display_range / 2) / 5) * 5)
+        return {'min': axis_min, 'max': axis_max}
+    
     def _generate_dual_company_script(self, chart_data):
         """生成双指标公司图表脚本"""
         chart_id = chart_data['id']
@@ -592,6 +670,11 @@ class FinalReportGenerator:
         # 计算dataZoom的start值，默认显示最近10年
         total_dates = len(periods)
         zoom_start = ((total_dates - 10) / total_dates) * 100 if total_dates > 10 else 0
+        
+        # 右轴智能范围（百分比指标）：用默认可视窗口（最近10期）计算轴范围
+        visible_n = min(10, len(values2))
+        visible_pct = values2[-visible_n:] if visible_n > 0 else values2
+        y2_axis_extra = self._calc_percent_axis_range(visible_pct) if metric2.get('unit') == '%' else {'scale': True}
         
         series = [
             {
@@ -615,6 +698,14 @@ class FinalReportGenerator:
                 'symbolSize': 6
             }
         ]
+        
+        y2_axis_cfg = json.dumps({
+            'type': 'value',
+            'name': f'{metric2["name"]}{metric2["unit"]}',
+            'position': 'right',
+            'splitLine': {'show': False},
+            **y2_axis_extra
+        }, ensure_ascii=False)
         
         script = f'''
         var chart_{chart_id};
@@ -678,15 +769,14 @@ class FinalReportGenerator:
                         position: 'left',
                         scale: true
                     }},
-                    {{
-                        type: 'value',
-                        name: '{metric2["name"]}{metric2["unit"]}',
-                        position: 'right',
-                        scale: true
-                    }}
+                    {y2_axis_cfg}
                 ],
                 series: {json.dumps(series, ensure_ascii=False)}
             }};
+            var _fmt1 = {self._label_formatter_js(metric1['unit'])};
+            var _fmt2 = {self._label_formatter_js(metric2['unit'])};
+            option.series[0].label = {{show: false, position: 'top', formatter: _fmt1}};
+            option.series[1].label = {{show: false, position: 'top', formatter: _fmt2}};
             chart_{chart_id}.setOption(option);
         }})();
         '''
@@ -720,6 +810,11 @@ class FinalReportGenerator:
         total_dates = len(periods)
         zoom_start = ((total_dates - 10) / total_dates) * 100 if total_dates > 10 else 0
         
+        # 右轴智能范围（百分比指标）：用默认可视窗口（最近10期）计算轴范围
+        visible_n = min(10, len(values2))
+        visible_pct = values2[-visible_n:] if visible_n > 0 else values2
+        y2_axis_extra = self._calc_percent_axis_range(visible_pct) if metric2.get('unit') == '%' else {'scale': True}
+        
         series = [
             {
                 'name': metric1['name'],
@@ -742,6 +837,14 @@ class FinalReportGenerator:
                 'symbolSize': 6
             }
         ]
+        
+        y2_axis_cfg = json.dumps({
+            'type': 'value',
+            'name': f'{metric2["name"]}{metric2["unit"]}',
+            'position': 'right',
+            'splitLine': {'show': False},
+            **y2_axis_extra
+        }, ensure_ascii=False)
         
         script = f'''
         var chart_{chart_id};
@@ -805,15 +908,14 @@ class FinalReportGenerator:
                         position: 'left',
                         scale: true
                     }},
-                    {{
-                        type: 'value',
-                        name: '{metric2["name"]}{metric2["unit"]}',
-                        position: 'right',
-                        scale: true
-                    }}
+                    {y2_axis_cfg}
                 ],
                 series: {json.dumps(series, ensure_ascii=False)}
             }};
+            var _fmt1 = {self._label_formatter_js(metric1['unit'])};
+            var _fmt2 = {self._label_formatter_js(metric2['unit'])};
+            option.series[0].label = {{show: false, position: 'top', formatter: _fmt1}};
+            option.series[1].label = {{show: false, position: 'top', formatter: _fmt2}};
             chart_{chart_id}.setOption(option);
         }})();
         '''
@@ -928,6 +1030,8 @@ class FinalReportGenerator:
                 }},
                 series: {json.dumps(series, ensure_ascii=False)}
             }};
+            var _fmtM = {self._label_formatter_js(metric['unit'])};
+            option.series.forEach(function(s) {{ s.label = {{show: false, position: 'top', formatter: _fmtM}}; }});
             chart_{chart_id}.setOption(option);
         }})();
         '''
@@ -1028,6 +1132,7 @@ class FinalReportGenerator:
                 }},
                 series: {json.dumps(series, ensure_ascii=False)}
             }};
+            option.series[0].label = {{show: false, position: 'top', formatter: function(p) {{ return p.value != null ? p.value.toFixed(1) + '%' : ''; }}}};
             
             // 添加参考线
             option.series.push({{
@@ -1080,18 +1185,27 @@ class FinalReportGenerator:
         
         chart_divs = []
         for i, chart in enumerate(section_charts):
+            chart_id = chart['id']
             if i == 0:
                 if len(config['metrics']) == 2:
-                    chart_divs.append(f'<h3>图1：{chart["ts_code"]} - {config["metrics"][0]["name"]} vs {config["metrics"][1]["name"]}</h3>')
+                    title = f'图1：{chart["ts_code"]} - {config["metrics"][0]["name"]} vs {config["metrics"][1]["name"]}'
                 else:
-                    chart_divs.append(f'<h3>图1：{chart["ts_code"]} vs 全A股中位数 - {config["metrics"][0]["name"]}历史走势对比</h3>')
+                    title = f'图1：{chart["ts_code"]} vs 全A股中位数 - {config["metrics"][0]["name"]}历史走势对比'
             elif i == 1:
                 if len(config['metrics']) == 2:
-                    chart_divs.append(f'<h3>图2：全A股中位数 - {config["metrics"][0]["name"]} vs {config["metrics"][1]["name"]}</h3>')
+                    title = f'图2：全A股中位数 - {config["metrics"][0]["name"]} vs {config["metrics"][1]["name"]}'
                 else:
-                    chart_divs.append(f'<h3>图2：{chart["ts_code"]} - {config["metrics"][0]["name"]}全A股分位数排名历史</h3>')
-            
-            chart_divs.append(f'<div id="chart_{chart["id"]}" class="chart-container"></div>')
+                    title = f'图2：{chart["ts_code"]} - {config["metrics"][0]["name"]}全A股分位数排名历史'
+            else:
+                title = ''
+            chart_divs.append(
+                f'<div class="chart-title-row">'
+                f'<h3>{title}</h3>'
+                f'<button class="btn-label-toggle" data-visible="false" '
+                f'onclick="toggleChartLabels(chart_{chart_id}, this)">显示数据标签</button>'
+                f'</div>'
+            )
+            chart_divs.append(f'<div id="chart_{chart_id}" class="chart-container"></div>')
         
         chart_html = ''.join(chart_divs)
         

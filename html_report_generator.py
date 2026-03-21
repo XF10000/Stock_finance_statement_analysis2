@@ -1395,11 +1395,49 @@ class HTMLReportGenerator:
         def generate_section_charts(charts):
             html = ""
             for chart in charts:
-                html += f'''
-            <div class="chart-container">
-                <div id="{chart['id']}" style="width: 100%; height: 500px;"></div>
-            </div>
-'''
+                cid = chart['id']
+                series_types = set(s['type'] for s in chart['data']['series'].values())
+                has_bar = 'bar' in series_types
+                has_line = 'line' in series_types
+                line_on = True   # line labels always start shown
+                bar_on = chart.get('show_values', False)
+                ctrl_html = ''
+                if has_line and has_bar:
+                    line_active = 'active' if line_on else ''
+                    bar_active = 'active' if bar_on else ''
+                    line_text = '隐藏折线标签' if line_on else '显示折线标签'
+                    bar_text = '显示柱形标签' if not bar_on else '隐藏柱形标签'
+                    ctrl_html = (
+                        f'<div class="chart-ctrl-row">'
+                        f'<button class="btn-label-toggle {line_active}" '
+                        f'data-visible="{"true" if line_on else "false"}" '
+                        f'onclick="toggleLabelsByType(chart_{cid}, \'line\', this)">{line_text}</button>'
+                        f'<button class="btn-label-toggle {bar_active}" '
+                        f'data-visible="{"true" if bar_on else "false"}" '
+                        f'onclick="toggleLabelsByType(chart_{cid}, \'bar\', this)">{bar_text}</button>'
+                        f'</div>'
+                    )
+                elif has_line:
+                    line_active = 'active' if line_on else ''
+                    line_text = '隐藏折线标签' if line_on else '显示折线标签'
+                    ctrl_html = (
+                        f'<div class="chart-ctrl-row">'
+                        f'<button class="btn-label-toggle {line_active}" '
+                        f'data-visible="{"true" if line_on else "false"}" '
+                        f'onclick="toggleLabelsByType(chart_{cid}, \'line\', this)">{line_text}</button>'
+                        f'</div>'
+                    )
+                elif has_bar:
+                    bar_active = 'active' if bar_on else ''
+                    bar_text = '隐藏柱形标签' if bar_on else '显示柱形标签'
+                    ctrl_html = (
+                        f'<div class="chart-ctrl-row">'
+                        f'<button class="btn-label-toggle {bar_active}" '
+                        f'data-visible="{"true" if bar_on else "false"}" '
+                        f'onclick="toggleLabelsByType(chart_{cid}, \'bar\', this)">{bar_text}</button>'
+                        f'</div>'
+                    )
+                html += f'{ctrl_html}\n            <div class="chart-container">\n                <div id="{cid}" style="width: 100%; height: 500px;"></div>\n            </div>\n'
             return html
         
         balance_containers = generate_section_charts(balance_charts)
@@ -1482,6 +1520,38 @@ class HTMLReportGenerator:
             border-radius: 4px;
         }}
         
+        .chart-ctrl-row {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            justify-content: flex-end;
+        }}
+        
+        .btn-label-toggle {{
+            padding: 3px 12px;
+            border: 1px solid #aaa;
+            border-radius: 4px;
+            background: white;
+            color: #666;
+            font-size: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }}
+        
+        .btn-label-toggle.active {{
+            background: #5B9BD5;
+            color: white;
+            border-color: #5B9BD5;
+        }}
+        
+        .btn-label-toggle:hover:not(.active) {{
+            border-color: #5B9BD5;
+            color: #5B9BD5;
+        }}
+        
         .footer {{
             text-align: center;
             margin-top: 50px;
@@ -1552,6 +1622,28 @@ class HTMLReportGenerator:
             chart.group = 'financialReportGroup';
         }});
         
+        // 折线/柱形标签独立开关
+        function toggleLabelsByType(chartInst, seriesType, btn) {{
+            if (!chartInst) return;
+            var visible = btn.dataset.visible === 'true';
+            visible = !visible;
+            btn.dataset.visible = visible;
+            var option = chartInst.getOption();
+            var patches = option.series.map(function(s) {{
+                if (s.type === seriesType) {{
+                    return {{ label: {{ show: visible }} }};
+                }}
+                return {{}};
+            }});
+            chartInst.setOption({{ series: patches }});
+            if (seriesType === 'line') {{
+                btn.textContent = visible ? '隐藏折线标签' : '显示折线标签';
+            }} else {{
+                btn.textContent = visible ? '隐藏柱形标签' : '显示柱形标签';
+            }}
+            btn.classList.toggle('active', visible);
+        }}
+        
         // 响应式调整
         window.addEventListener('resize', function() {{
             {self._generate_resize_script(charts_config)}
@@ -1570,6 +1662,7 @@ class HTMLReportGenerator:
         data = chart_config['data']
         colors = chart_config.get('colors', {})
         y_axis_names = chart_config.get('y_axis_names', ['', ''])
+        value_unit = chart_config.get('value_unit', '')
         line_format = chart_config.get('line_format', 'value')
         bar_format = chart_config.get('bar_format', 'int')  # 柱状图格式：int或decimal
         show_values = chart_config.get('show_values', False)
@@ -1627,14 +1720,13 @@ class HTMLReportGenerator:
                 bar_category_gap = chart_config.get('bar_category_gap', '20%')
                 series_item['barGap'] = '5%'
                 series_item['barCategoryGap'] = bar_category_gap
-                if show_values:
-                    # 根据bar_format选择格式化标记
-                    formatter = '__FORMATTER_DECIMAL__' if bar_format == 'decimal' else '__FORMATTER_INT__'
-                    series_item['label'] = {
-                        'show': True,
-                        'position': 'inside',
-                        'formatter': formatter  # 标记，稍后替换为JS函数
-                    }
+                # 始终添加 label 配置，show 由 show_values 决定（方便 toggle 开关）
+                bar_fmt_marker = '__FORMATTER_DECIMAL__' if bar_format == 'decimal' else '__FORMATTER_INT__'
+                series_item['label'] = {
+                    'show': show_values,
+                    'position': 'inside',
+                    'formatter': bar_fmt_marker
+                }
             
             # 折线图配置
             elif series_type == 'line':
@@ -1701,7 +1793,7 @@ class HTMLReportGenerator:
                             if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {{
                                 formattedValue = value != null ? value.toFixed(1) + '%' : '-';
                             }} else {{
-                                formattedValue = value != null ? value.toFixed(0) : '-';
+                                formattedValue = value != null ? {f"value.toFixed(1) + '{value_unit}'" if value_unit else "value.toFixed(0)"} : '-';
                             }}
                             result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
                         }});
@@ -1785,7 +1877,7 @@ class HTMLReportGenerator:
                         }};
                     }} else if (s.label.formatter === '__FORMATTER_INT__') {{
                         s.label.formatter = function(params) {{
-                            return params.value != null ? params.value.toFixed(0) : '';
+                            return params.value != null ? params.value.toFixed(1) : '';
                         }};
                     }}
                 }}
@@ -2025,35 +2117,67 @@ class HTMLReportGenerator:
             else:
                 debt_change = 0
             
-            # 6. FCFE = 净利润 + 折旧摊销 - 资本支出 - 营运资本变化量 + 债务变化
+            # 6. FCFE = 净利润 + 折旧摊销 - 资本支出 - 营运资本变化量 + 债务变化（原始值，未缩放）
             if pd.notna(净利润):
                 fcfe = float(净利润) + total_dep
                 if pd.notna(capex):
                     fcfe -= float(capex)
                 fcfe -= wc_change
                 fcfe += debt_change
-                FCFE_data.append(round(fcfe / 1e8, 0))
+                FCFE_data.append(fcfe)
             else:
                 FCFE_data.append(None)
         
-        # 读取分红数据
-        分红_data = self._get_dividend_data(date_columns)
+        # 读取分红数据（原始值）
+        分红_raw = self._get_dividend_data(date_columns, return_raw=True)
+        
+        # 智能单位：根据最大绝对值选择合适的量级
+        all_raw = [v for v in FCFE_data + 分红_raw if v is not None]
+        if all_raw:
+            max_abs = max(abs(v) for v in all_raw)
+            if max_abs >= 1e8:
+                unit_label = '亿元'
+                divisor = 1e8
+                decimal_places = 1
+            elif max_abs >= 1e4:
+                unit_label = '万元'
+                divisor = 1e4
+                decimal_places = 0
+            else:
+                unit_label = '元'
+                divisor = 1
+                decimal_places = 0
+        else:
+            unit_label = '亿元'
+            divisor = 1e8
+            decimal_places = 1
+        
+        def scale(v):
+            if v is None:
+                return None
+            return round(v / divisor, decimal_places)
+        
+        FCFE_scaled = [scale(v) for v in FCFE_data]
+        分红_scaled = [scale(v) for v in 分红_raw]
         
         # 构建图表配置
         chart = {
             'id': 'chart_fcfe_dividend',
             'title': '股权自由现金流VS分红',
             'type': 'line',
+            'y_axis_names': ['', unit_label],
+            'value_unit': unit_label,
+            'line_format': 'number' if decimal_places > 0 else 'value',
             'data': {
                 'dates': date_columns,
                 'series': {
                     'FCFE': {
                         'type': 'line',
-                        'data': FCFE_data
+                        'data': FCFE_scaled
                     },
                     '分红': {
                         'type': 'line',
-                        'data': 分红_data
+                        'data': 分红_scaled
                     }
                 }
             },
@@ -2065,7 +2189,7 @@ class HTMLReportGenerator:
         
         return chart
     
-    def _get_dividend_data(self, date_columns: List[str]) -> List:
+    def _get_dividend_data(self, date_columns: List[str], return_raw: bool = False) -> List:
         """从数据库读取分红数据"""
         import os
         from financial_data_manager import FinancialDataManager
@@ -2149,7 +2273,10 @@ class HTMLReportGenerator:
                 
                 if cash_div_per_share > 0 and col in total_share_dict:
                     total_dividend = cash_div_per_share * total_share_dict[col]
-                    dividend_data.append(round(total_dividend / 1e8, 0))
+                    if return_raw:
+                        dividend_data.append(round(total_dividend, 0))
+                    else:
+                        dividend_data.append(round(total_dividend / 1e8, 0))
                 else:
                     dividend_data.append(None)
             
