@@ -38,8 +38,9 @@ class TestMarketDataManager:
         # 保存数据
         db_manager.save_financial_data(
             ts_code='000001.SZ',
-            table_name='balancesheet',
-            data=test_data
+            end_date='20231231',
+            data_type='balancesheet',
+            data=pd.DataFrame([test_data])
         )
         
         # 读取数据
@@ -47,7 +48,7 @@ class TestMarketDataManager:
         
         assert len(result) == 1
         assert result.iloc[0]['ts_code'] == '000001.SZ'
-        assert result.iloc[0]['end_date'] == '20231231'
+        assert str(result.iloc[0]['end_date']) == '20231231'
         assert result.iloc[0]['total_assets'] == 1000000
     
     def test_save_core_indicators(self, db_manager):
@@ -87,10 +88,10 @@ class TestMarketDataManager:
     
     def test_get_stock_list(self, populated_db):
         """测试获取股票列表"""
-        stocks = populated_db.get_stock_list()
+        stocks = populated_db.get_all_stocks()
         
         assert len(stocks) > 0
-        assert '000001.SZ' in [s[0] for s in stocks]
+        assert '000001.SZ' in [s['ts_code'] for s in stocks]
     
     def test_data_update_with_duplicate(self, db_manager):
         """测试重复数据更新（INSERT OR REPLACE）"""
@@ -101,11 +102,11 @@ class TestMarketDataManager:
         }
         
         # 第一次保存
-        db_manager.save_financial_data('000001.SZ', 'balancesheet', test_data)
+        db_manager.save_financial_data('000001.SZ', '20231231', 'balancesheet', pd.DataFrame([test_data]))
         
         # 更新数据
         test_data['total_assets'] = 1200000
-        db_manager.save_financial_data('000001.SZ', 'balancesheet', test_data)
+        db_manager.save_financial_data('000001.SZ', '20231231', 'balancesheet', pd.DataFrame([test_data]))
         
         # 验证只有一条记录且值已更新
         result = db_manager.get_financial_data('000001.SZ', 'balancesheet')
@@ -123,12 +124,13 @@ class TestMarketDataManagerThreadSafety:
         def write_data(ts_code, end_date):
             db_manager.save_financial_data(
                 ts_code=ts_code,
-                table_name='balancesheet',
-                data={
+                end_date=end_date,
+                data_type='balancesheet',
+                data=pd.DataFrame([{
                     'ts_code': ts_code,
                     'end_date': end_date,
                     'total_assets': 1000000
-                }
+                }])
             )
         
         threads = []

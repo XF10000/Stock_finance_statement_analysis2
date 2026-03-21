@@ -12,7 +12,7 @@ from typing import List, Dict, Optional
 from datetime import datetime
 import yaml
 import os
-from queue import Queue
+from queue import Queue, Empty
 import pandas as pd
 from tqdm import tqdm
 from tushare_client import TushareClient
@@ -203,11 +203,13 @@ class FinancialDataUpdater:
                     self._write_batch(batch)
                     batch = []
                     
-            except Exception as e:
-                # 队列为空或超时，写入当前批次
+            except Empty:
+                # 队列超时（正常），写入当前积累的批次
                 if batch:
                     self._write_batch(batch)
                     batch = []
+            except Exception as e:
+                self.logger.error(f"批量写入线程异常: {e}", exc_info=True)
     
     def _write_batch(self, batch: List[Dict]):
         """执行批量写入"""
@@ -709,26 +711,22 @@ class FinancialDataUpdater:
         Returns:
             需要更新的股票列表
         """
-        import pandas as pd
-        
         conn = self.db_manager.get_connection()
         
         try:
             # 提取所有股票代码
             stock_codes = [s['ts_code'] for s in stocks]
             
-            # 构建 SQL IN 子句
-            codes_str = "','".join(stock_codes)
-            
-            # 一次性查询所有已有数据的股票
+            # 使用参数化查询，避免 SQL 注入风险
+            placeholders = ','.join('?' * len(stock_codes))
             query = f"""
                 SELECT DISTINCT ts_code 
                 FROM balancesheet 
-                WHERE ts_code IN ('{codes_str}') 
-                AND end_date = '{target_quarter}'
+                WHERE ts_code IN ({placeholders})
+                AND end_date = ?
             """
             
-            existing_df = pd.read_sql_query(query, conn)
+            existing_df = pd.read_sql_query(query, conn, params=stock_codes + [target_quarter])
             existing_stocks = set(existing_df['ts_code'].tolist())
             
             # 找出缺失的股票
@@ -743,8 +741,6 @@ class FinancialDataUpdater:
             self.logger.error(f"批量检查失败: {e}")
             # 出错时返回所有股票（保守策略）
             return stocks
-        finally:
-            conn.close()
     
     def update_latest_quarter(self, target_quarter: str = None, 
                              calculate_indicators: bool = True):

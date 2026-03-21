@@ -1,9 +1,13 @@
 """
 重命名验证测试：确保重命名后代码能正常工作
+（此文件已过时，对应旧模块名 market_data_manager / market_analyzer / update_market_data，
+ 这些模块已被重命名。新验证见 test_financial_data_rename.py）
 """
 import pytest
 import os
 import sys
+
+pytestmark = pytest.mark.skip(reason="旧模块名已移除，验证逻辑已迁移至 test_financial_data_rename.py")
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

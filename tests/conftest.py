@@ -9,7 +9,7 @@ import pandas as pd
 from datetime import datetime
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def test_db_path():
     """创建临时测试数据库"""
     with tempfile.NamedTemporaryFile(mode='w', suffix='.db', delete=False) as f:
@@ -25,8 +25,8 @@ def test_db_path():
 @pytest.fixture(scope="function")
 def db_manager(test_db_path):
     """创建数据库管理器实例"""
-    from market_data_manager import MarketDataManager
-    manager = MarketDataManager(test_db_path)
+    from financial_data_manager import FinancialDataManager
+    manager = FinancialDataManager(test_db_path)
     yield manager
     # 每个测试后清理连接
     if hasattr(manager.local, 'conn') and manager.local.conn:
@@ -77,28 +77,34 @@ def sample_cashflow_data():
 @pytest.fixture(scope="function")
 def populated_db(db_manager, sample_balance_data, sample_income_data, sample_cashflow_data):
     """填充了示例数据的数据库"""
-    # 保存资产负债表数据
+    # 添加测试股票到 stock_list
+    db_manager.add_stock('000001.SZ', '平安银行', '主板', '19910403')
+    
+    # 保存资产负债表数据（按报告期逐条保存）
     for _, row in sample_balance_data.iterrows():
         db_manager.save_financial_data(
             ts_code=row['ts_code'],
-            table_name='balancesheet',
-            data=row.to_dict()
+            end_date=str(row['end_date']),
+            data_type='balancesheet',
+            data=pd.DataFrame([row.to_dict()])
         )
     
     # 保存利润表数据
     for _, row in sample_income_data.iterrows():
         db_manager.save_financial_data(
             ts_code=row['ts_code'],
-            table_name='income',
-            data=row.to_dict()
+            end_date=str(row['end_date']),
+            data_type='income',
+            data=pd.DataFrame([row.to_dict()])
         )
     
     # 保存现金流量表数据
     for _, row in sample_cashflow_data.iterrows():
         db_manager.save_financial_data(
             ts_code=row['ts_code'],
-            table_name='cashflow',
-            data=row.to_dict()
+            end_date=str(row['end_date']),
+            data_type='cashflow',
+            data=pd.DataFrame([row.to_dict()])
         )
     
     return db_manager

@@ -5,447 +5,245 @@
 ## ✨ 功能特点
 
 ### 数据管理
-- ✅ 自动获取全A股财务数据（5,100+ 只股票）
-- ✅ 财务四表：资产负债表、利润表、现金流量表、财务指标
-- ✅ 分红数据：现金分红、送股、转增
-- ✅ 本地 SQLite 数据库存储
-- ✅ 智能增量更新（批量检查 + 按需获取）
-- ✅ 股票代码自动补全（支持不带后缀）
-- ✅ 完善的日志记录和错误处理
+- 自动获取全A股财务四表（资产负债表、利润表、现金流量表、财务指标）及分红数据
+- 本地 SQLite 数据库存储，支持 5,100+ 只股票
+- 智能增量更新：批量检查缺失数据，按需调用 API
+- 股票代码自动补全（支持不带交易所后缀的6位代码）
+- 多线程并发获取 + API 限流控制（150次/分钟）
+- 断点续传支持
 
 ### 数据分析
-- ✅ 5大核心指标计算（应收账款周转率、毛利率、长期资产周转率、净营运资本比率、经营现金流比率）
-- ✅ 年报 + TTM（滚动12个月）双视角分析
-- ✅ 市场分位数排名
-- ✅ 自由现金流（FCFF）分析
+- 5大核心指标：应收账款周转率、毛利率、长期资产周转率、净营运资本比率、经营现金流比率
+- 年报 + TTM（滚动12个月）双视角计算
+- 全市场分位数排名（基于同期所有A股）
+- 公司特定重分类规则支持（如融资租赁资产调整）
 
 ### 报告生成
-- ✅ 完整的 HTML 可视化报告（ECharts 图表）
-- ✅ 资产负债、利润、现金流、核心指标 4大分析模块
-- ✅ Excel 汇总报告
-- ✅ FCFF 专项报告
+- HTML 交互式财务分析报告（ECharts 图表）
+- 三大报表重构（股权价值增加表、FCFF 现金流）
+- 年报 + TTM 汇总 CSV
+- 核心指标趋势 + 市场分位数对比报告
 
-### 性能优化
-- ✅ API 限流控制（150次/分钟）
-- ✅ 批量数据库操作
-- ✅ 多线程并发获取
-- ✅ 智能季度判断（避免获取未发布数据）
-- ✅ 批量检查优化（5,191只股票仅需0.4秒）
+---
 
 ## 🚀 快速开始
 
-### 安装依赖
+### 1. 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 配置
-## 配置
-
-1. 复制配置文件模板：
+### 2. 配置
 
 ```bash
 cp config.yaml.example config.yaml
 ```
 
-2. 编辑 `config.yaml`，填入你的 Tushare Token：
+编辑 `config.yaml`，填入 Tushare Token：
 
 ```yaml
 tushare:
-  token: "你的Tushare Token"
+  token: "your_token_here"
+
+restructure:
+  equity_cost_rate: 0.08   # 股权资本成本率，用于利润表重构
 ```
 
-## 股票代码格式说明
-
-系统支持两种股票代码格式：
-
-### 1. 简化格式（推荐）
-
-只需输入6位股票代码数字，系统自动判断交易所：
+### 3. 初始化数据库（首次运行）
 
 ```bash
-python main.py 000333    # 自动识别为 000333.SZ（深圳）
-python main.py 600519    # 自动识别为 600519.SH（上海）
-python main.py 603345    # 自动识别为 603345.SH（上海）
+python update_financial_data.py --init
 ```
 
-**自动判断规则：**
-- `000`、`002`、`003`、`300` 开头 → `.SZ`（深圳交易所）
-- `600`、`601`、`603`、`605`、`688` 开头 → `.SH`（上海交易所）
-
-### 2. 完整格式
-
-也可以输入完整的股票代码（带交易所后缀）：
+获取全A股完整历史财务数据（约5,100只股票），支持断点续传：
 
 ```bash
-python main.py 000333.SZ
-python main.py 600519.SH
+python update_financial_data.py --init --resume 000333
 ```
 
-## 使用方法
-
-### 1. 一键生成完整财务分析（推荐）
-
-**只需一条命令，自动完成所有分析**：
+### 4. 生成单股分析报告
 
 ```bash
-python3 main.py 603345
+python3 main.py 000333    # 支持6位代码（自动补全交易所后缀）
+python3 main.py 000333.SZ # 也支持完整格式
 ```
 
-**自动生成内容**：
-1. ✅ **历史财务报表重构**（季度数据）
-   - 资产负债表重构
-   - 利润表重构（股权价值增加表）
-   - 现金流量表重构
+---
 
-2. ✅ **年度财务报表+TTM**（覆盖所有历史年份）
-   - 年度资产负债表+TTM
-   - 年度利润表+TTM
-   - 年度现金流量表+TTM
+## 📊 单股分析报告（main.py）
 
-3. ✅ **HTML交互式财务分析报告**
-   - 利润分析图表
-   - 资产负债分析图表
-   - 经营效率分析图表（包括ROIC）
-   - 支持时间轴缩放、数据点查看等交互功能
-
-**示例公司**：
-```bash
-python3 main.py 603345  # 安井食品（推荐样例）
-python3 main.py 000333  # 美的集团
-python3 main.py 600900  # 长江电力
-```
+一条命令自动生成：
+1. 三大报表重构（资产负债表、股权价值增加表、FCFF 现金流）
+2. 年报 + TTM 汇总报表（覆盖所有历史年份）
+3. HTML 交互式财务分析报告
+4. 核心指标分析报告（含市场分位数）
 
 **输出文件**：
 ```
 data/
-├── 603345.SH_balancesheet_restructured.csv      # 重构后的资产负债表
-├── 603345.SH_income_restructured.csv            # 重构后的利润表
-├── 603345.SH_cashflow_restructured.csv          # 重构后的现金流量表
-├── 603345.SH_balance_sheet_annual_ttm.csv       # 年报+TTM资产负债表
-├── 603345.SH_income_statement_annual_ttm.csv    # 年报+TTM利润表
-├── 603345.SH_cashflow_statement_annual_ttm.csv  # 年报+TTM现金流量表
-└── 603345.SH_financial_report.html              # HTML财务分析报告 ⭐
+├── {ts_code}_balancesheet_restructured.csv      # 重构资产负债表
+├── {ts_code}_income_restructured.csv            # 重构利润表（股权价值增加表）
+├── {ts_code}_cashflow_restructured.csv          # 重构现金流量表
+├── {ts_code}_balance_sheet_annual_ttm.csv       # 年报+TTM 资产负债表
+├── {ts_code}_income_statement_annual_ttm.csv    # 年报+TTM 利润表
+├── {ts_code}_cashflow_statement_annual_ttm.csv  # 年报+TTM 现金流量表
+├── {ts_code}_financial_report.html              # HTML 财务分析报告 ⭐
+└── {ts_code}_核心指标_{日期}.html               # 核心指标报告 ⭐
 ```
 
-### 2. 命令行方式（基础数据获取）
-
-获取单家公司的全部历史财务数据（默认：中文列名 + 转置格式）：
-
+**常用参数**：
 ```bash
-# 简化格式：只需股票代码数字
-python main.py 000333
+# 指定日期范围
+python3 main.py 000333 --start-date 20180101 --end-date 20241231
 
-# 也支持完整格式
-python main.py 600519.SH
+# 同时输出 Excel
+python3 main.py 000333 --format excel
+
+# 指定输出目录
+python3 main.py 000333 --output-dir ./reports
+
+# 保存分红数据为 Excel
+python3 main.py 000333 --save-dividend-excel
+
+# 使用自定义数据库路径
+python3 main.py 000333 --db-path /path/to/financial_data.db
 ```
 
-获取指定日期范围的数据：
+---
 
-```bash
-python main.py 600519.SH --start-date 20200101 --end-date 20231231
-```
+## 🔄 数据更新（update_financial_data.py）
 
-保存为 Excel 格式：
+### 增量更新（推荐定期运行）
 
-```bash
-python main.py 600519.SH --format excel
-```
-
-### 3. 数据更新管理
-
-#### 首次初始化（获取全A股数据）
-```bash
-python update_financial_data.py --init
-```
-- 获取全A股列表（约5,100只）
-- 获取每只股票的完整历史财务数据
-- 自动计算核心指标
-- 支持断点续传：`--resume 000333`
-
-#### 增量更新（推荐定期运行）
 ```bash
 python update_financial_data.py --update-latest
 ```
-**智能优化**：
-- ✅ 根据当前月份自动判断目标季度
-  - 2-4月 → 上年Q4
-  - 5-7月 → 本年Q1  
-  - 8-10月 → 本年Q2
-  - 11-1月 → 本年Q3
-- ✅ 批量检查（0.4秒完成5,191只股票）
-- ✅ 只更新缺失的股票（节省80%+ API调用）
 
-#### 更新单只股票
+自动判断目标季度（根据当前月份）：
+
+| 月份 | 目标季度 |
+|------|---------|
+| 2–4 月 | 上年 Q4（12/31） |
+| 5–7 月 | 本年 Q1（3/31） |
+| 8–10 月 | 本年 Q2（6/30） |
+| 11–1 月 | 本年 Q3（9/30） |
+
+### 更新单只股票
+
 ```bash
-# 增量更新（最新季度）
+# 最新季度（增量）
 python update_financial_data.py --update-stock 000001
 
-# 完整更新（全部历史）
+# 全部历史数据
 python update_financial_data.py --update-stock 000001 --full
-```
-**特性**：支持不带后缀的股票代码（000001 → 000001.SZ）
 
-#### 更新分红数据
+# 更新分红数据
+python update_financial_data.py --update-stock-dividend 000333
+```
+
+### 其他操作
+
 ```bash
 # 更新所有股票的分红数据
 python update_financial_data.py --update-dividend
 
-# 更新单只股票的分红数据（新增）
-python update_financial_data.py --update-stock-dividend 000333
-```
-**智能优化**：根据每只股票财务数据最新季度获取分红
-
-#### 重新计算核心指标
-```bash
+# 强制重新计算所有股票核心指标
 python update_financial_data.py --recalculate-all
-```
 
-### 4. 高级选项
-
-#### 指定季度更新
-```bash
+# 指定季度更新
 python update_financial_data.py --update-latest --quarter 20241231
-```
 
-#### 调整并发线程数
-```bash
+# 调整并发线程数（默认5，建议2-8）
 python update_financial_data.py --update-latest --workers 8
-```
 
-#### 不自动计算核心指标
-```bash
+# 不自动计算核心指标
 python update_financial_data.py --update-latest --no-indicators
+```
+
+---
+
+## 🗂️ 股票代码格式
+
+系统自动补全交易所后缀：
 
 ```bash
-python main.py 000858.SZ --format excel
+python3 main.py 000333   # → 000333.SZ（深圳）
+python3 main.py 600519   # → 600519.SH（上海）
+python3 main.py 688981   # → 688981.SH（科创板）
 ```
 
-同时保存 CSV 和 Excel：
+判断规则：
+- `000`、`002`、`003`、`300` → `.SZ`
+- `600`、`601`、`603`、`605`、`688` → `.SH`
+- 其余默认 `.SZ`
 
-```bash
-python main.py 000333.SZ --format both
-```
+---
 
-**使用原始格式**（字段横向，时间纵向）：
+## 🗃️ 数据库结构
 
-```bash
-python main.py 600519.SH --no-transpose
-```
+SQLite 数据库（`database/financial_data.db`）包含以下表：
 
-**使用英文列名**（不翻译）：
-
-```bash
-python main.py 600519.SH --no-translate
-```
-
-**组合使用**：
-
-```bash
-# 原始格式 + Excel 输出
-python main.py 000001.SZ --no-transpose --format excel
-
-# 英文列名 + 原始格式
-python main.py 000001.SZ --no-translate --no-transpose
-```
-
-### 2. Python 代码方式
-
-```python
-from tushare_client import TushareClient
-
-# 初始化客户端
-client = TushareClient(config_path='config.yaml')
-
-# 获取全部财务数据（英文字段）
-data = client.get_all_financial_data('000001.SZ')
-
-# 获取全部财务数据（中文字段，推荐）
-data_cn = client.get_all_financial_data('000001.SZ', translate=True)
-
-# 保存数据
-client.save_to_csv(data_cn, '000001.SZ')
-
-# 查看数据（中文列名更易读）
-print(data_cn['fina_indicator'].head())
-```
-
-### 3. 数据格式说明
-
-#### 字段翻译功能
-
-**默认行为：所有字段名自动翻译为中文**
-
-所有财务报表字段都支持中英文对照，包括：
-- **财务指标表**：180 个字段
-- **资产负债表**：156 个字段  
-- **利润表**：94 个字段
-- **现金流量表**：99 个字段
-
-**翻译对比示例：**
-
-| 英文字段名 | 中文含义 |
-|-----------|---------|
-| `eps` | 基本每股收益 |
-| `roe` | 净资产收益率 |
-| `accounts_receiv` | 应收账款 |
-| `total_assets` | 资产总计 |
-| `net_profit` | 净利润 |
-
-默认输出的 CSV/Excel 文件使用中文列名，更便于理解和分析。
-
-如果需要英文列名，使用 `--no-translate` 参数或设置 `translate=False`。
-
-#### 数据转置功能
-
-**默认行为：自动转置为分析友好格式**
-
-系统默认使用转置格式，更适合财务数据分析：
-
-**转置格式**（默认）：
-```
-字段名, 20241231, 20240930, 20240630, ...
-基本每股收益, 2.15, 1.94, 1.23, ...
-净资产收益率, 10.08, 9.10, 5.79, ...
-应收账款, 815944069, 830587000, 850000000, ...
-资产总计, 20408219467, 19800000000, 19500000000, ...
-```
-
-**原始格式**（使用 `--no-transpose` 参数）：
-```
-TS代码, 公告日期, 报告期, 基本每股收益, 净资产收益率, ...
-000001.SZ, 20250315, 20241231, 2.15, 10.08, ...
-000001.SZ, 20241019, 20240930, 1.94, 9.10, ...
-```
-
-**转置格式的优势：**
-- ✅ 更容易对比不同时期的财务数据
-- ✅ 适合横向分析和趋势观察
-- ✅ Excel 中更方便查看大量字段
-- ✅ 符合财务分析习惯
-
-### 4. 运行示例
-
-```bash
-python example_usage.py
-```
-
-### 5. 测试翻译功能
-
-```bash
-python test_translation.py
-```
-
-## 数据说明
-
-### 获取的字段策略
-
-本项目获取**所有字段**，无论 Tushare 文档中标记的"默认显示"是 Y 还是 N。
-
-这是因为许多重要字段（如 `receiv_financing` 应收款项融资、`contract_assets` 合同资产等）默认不显示，但对财务分析非常重要。
-
-### 四大财务报表
-
-| 报表类型 | 字段数量 | 说明 |
-|---------|---------|------|
-| 财务指标表 (fina_indicator) | 约 180 个 | 综合财务指标，包括每股指标、盈利能力、营运能力、偿债能力等 |
-| 资产负债表 (balancesheet) | 约 156 个 | 反映企业特定时点的财务状况 |
-| 利润表 (income) | 约 94 个 | 反映企业一定时期内的经营成果 |
-| 现金流量表 (cashflow) | 约 99 个 | 反映企业现金流入和流出情况 |
-
-### 输出文件格式
-
-运行后会在 `data` 目录生成以下文件：
-
-```
-data/
-├── 000001.SZ_fina_indicator.csv   # 财务指标表
-├── 000001.SZ_balancesheet.csv      # 资产负债表
-├── 000001.SZ_income.csv            # 利润表
-└── 000001.SZ_cashflow.csv          # 现金流量表
-```
-
-如果选择 Excel 格式，会生成一个包含多个 sheet 的 Excel 文件。
-
-## API 方法说明
-
-### TushareClient 类
-
-#### 主要方法
-
-| 方法 | 说明 |
+| 表名 | 说明 |
 |------|------|
-| `get_fina_indicator(ts_code, start_date, end_date)` | 获取财务指标表 |
-| `get_balancesheet(ts_code, start_date, end_date)` | 获取资产负债表 |
-| `get_income(ts_code, start_date, end_date)` | 获取利润表 |
-| `get_cashflow(ts_code, start_date, end_date)` | 获取现金流量表 |
-| `get_all_financial_data(ts_code, start_date, end_date)` | 获取全部财务数据 |
-| `save_to_csv(data, ts_code, output_dir)` | 保存为 CSV |
-| `save_to_excel(data, ts_code, output_dir)` | 保存为 Excel |
+| `stock_list` | 全A股列表 |
+| `balancesheet` | 资产负债表（JSON Blob） |
+| `income` | 利润表（JSON Blob） |
+| `cashflow` | 现金流量表（JSON Blob） |
+| `fina_indicator` | 财务指标表（JSON Blob） |
+| `dividend` | 分红送股数据 |
+| `core_indicators` | 5大核心指标 + 市场分位数 |
 
-#### 参数说明
+---
 
-- `ts_code`: 股票代码，格式为 `代码.交易所`（如 `000001.SZ`）
-  - SZ: 深圳证券交易所
-  - SH: 上海证券交易所
-- `start_date`: 开始日期，格式 `YYYYMMDD`（可选）
-- `end_date`: 结束日期，格式 `YYYYMMDD`（可选）
-
-## 注意事项
-
-1. **Tushare 积分要求**：不同接口对积分有不同要求，积分不足可能导致部分数据无法获取
-2. **请求频率限制**：代码已内置请求间隔控制，避免触发 API 限流
-3. **数据量**：获取全部历史数据可能需要较长时间，建议在非高峰期运行
-4. **数据过滤**：自动过滤上市前的无效数据，确保数据准确性
-
-## 项目结构
+## 📁 项目结构
 
 ```
 Stock_finance_statement_analysis2/
-├── config.yaml              # 配置文件（包含 Token）
-├── requirements.txt         # Python 依赖
-├── tushare_client.py        # Tushare 客户端核心类
-├── main.py                  # 命令行入口
-├── example_usage.py         # 使用示例
-├── docs/
-│   └── Tushare_Fields_Documentation.md  # 字段文档
-├── data/                    # 数据输出目录
-└── logs/                    # 日志目录
+├── main.py                          # 单股分析入口
+├── update_financial_data.py         # 全A股数据更新程序
+├── financial_data_manager.py        # 数据库管理核心 + normalize_stock_code
+├── financial_data_analyzer.py       # 市场分位数分析
+├── core_indicators_analyzer.py      # 5大核心指标计算
+├── tushare_client.py                # Tushare API 客户端
+├── annual_report_generator.py       # 年报+TTM 生成
+├── html_report_generator.py         # HTML 财务分析报告
+├── final_report_generator_echarts.py# 核心指标 ECharts 报告
+├── balance_sheet_restructure.py     # 资产负债表重构
+├── income_statement_restructure.py  # 利润表重构（股权价值增加表）
+├── cashflow_statement_restructure.py# 现金流量表重构
+├── ttm_generator.py                 # TTM 计算
+├── balance_sheet_reclassifier.py    # 公司特定重分类规则
+├── field_mapping.py                 # 字段中英文映射
+├── config.yaml.example              # 配置文件模板
+├── config.yaml                      # 配置文件（含 Token，不入库）
+├── requirements.txt                 # Python 依赖
+├── pytest.ini                       # 测试配置
+├── tests/                           # 测试套件
+├── database/                        # SQLite 数据库
+├── data/                            # 分析输出（CSV / HTML）
+├── logs/                            # 运行日志
+└── docs/                            # 字段文档
 ```
 
-## 常见问题
+---
 
-### 1. Token 错误
+## ⚠️ 注意事项
 
-确保 `config.yaml` 中的 token 正确无误，且已复制到项目根目录。
+1. **Tushare 积分**：财务四表接口需要一定积分，积分不足会导致数据获取失败
+2. **首次初始化耗时**：全A股约5,100只，完整初始化需要数小时，建议分批或使用 `--resume` 断点续传
+3. **数据延迟**：Tushare 财务数据通常在财报披露后1-2个工作日更新
+4. **API 限流**：系统已内置限流（150次/分钟），无需手动控制
 
-### 2. 积分不足
-
-部分高级接口需要足够的 Tushare 积分，可通过以下方式获取积分：
-- 注册并完善个人信息
-- 每日签到
-- 分享项目
-- 捐赠支持
-
-### 3. 数据为空
-
-可能原因：
-- 股票代码错误
-- 日期范围内无数据
-- 积分不足无法访问该接口
-
-### 4. 请求超时
-
-网络问题或 API 响应慢，代码会自动重试 3 次。
+---
 
 ## 参考文档
 
 - [Tushare 官方文档](https://tushare.pro/document/2)
-- [财务指标表接口](https://tushare.pro/document/2?doc_id=79)
 - [资产负债表接口](https://tushare.pro/document/2?doc_id=36)
 - [利润表接口](https://tushare.pro/document/2?doc_id=33)
 - [现金流量表接口](https://tushare.pro/document/2?doc_id=44)
+- [财务指标表接口](https://tushare.pro/document/2?doc_id=79)
 
 ## License
 

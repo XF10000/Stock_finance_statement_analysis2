@@ -13,17 +13,16 @@ class TestDataFlowIntegration:
                           sample_income_data, sample_cashflow_data):
         """测试完整工作流：保存数据 -> 计算指标 -> 更新分位数"""
         from core_indicators_analyzer import CoreIndicatorsAnalyzer
-        from market_analyzer import MarketAnalyzer
         
         # 1. 保存财务数据
         for _, row in sample_balance_data.iterrows():
-            db_manager.save_financial_data('000001.SZ', 'balancesheet', row.to_dict())
+            db_manager.save_financial_data('000001.SZ', str(row['end_date']), 'balancesheet', pd.DataFrame([row.to_dict()]))
         
         for _, row in sample_income_data.iterrows():
-            db_manager.save_financial_data('000001.SZ', 'income', row.to_dict())
+            db_manager.save_financial_data('000001.SZ', str(row['end_date']), 'income', pd.DataFrame([row.to_dict()]))
         
         for _, row in sample_cashflow_data.iterrows():
-            db_manager.save_financial_data('000001.SZ', 'cashflow', row.to_dict())
+            db_manager.save_financial_data('000001.SZ', str(row['end_date']), 'cashflow', pd.DataFrame([row.to_dict()]))
         
         # 2. 计算核心指标
         analyzer = CoreIndicatorsAnalyzer()
@@ -111,12 +110,13 @@ class TestDatabaseConsistency:
         for i in range(3):
             db_manager.save_financial_data(
                 ts_code=ts_code,
-                table_name='balancesheet',
-                data={
+                end_date='20231231',
+                data_type='balancesheet',
+                data=pd.DataFrame([{
                     'ts_code': ts_code,
                     'end_date': '20231231',
                     'total_assets': 1000000 + i * 100000
-                }
+                }])
             )
         
         # 验证只有一条记录且是最新值
@@ -144,8 +144,9 @@ class TestErrorHandling:
         with pytest.raises(Exception):
             db_manager.save_financial_data(
                 ts_code='000001.SZ',
-                table_name='invalid_table_name',
-                data={'ts_code': '000001.SZ'}
+                end_date='20231231',
+                data_type='invalid_table_name',
+                data=pd.DataFrame([{'ts_code': '000001.SZ'}])
             )
     
     def test_missing_required_fields(self, db_manager):
@@ -154,8 +155,9 @@ class TestErrorHandling:
         try:
             db_manager.save_financial_data(
                 ts_code='000001.SZ',
-                table_name='balancesheet',
-                data={'end_date': '20231231'}  # 缺少ts_code
+                end_date='20231231',
+                data_type='balancesheet',
+                data=pd.DataFrame([{'end_date': '20231231'}])  # 缺少ts_code
             )
             # 如果没有抛出异常，至少验证数据是否正确保存
             result = db_manager.get_financial_data('000001.SZ', 'balancesheet')

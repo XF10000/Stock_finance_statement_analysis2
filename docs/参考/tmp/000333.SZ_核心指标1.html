@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>000333.SZ 财务指标分析报告</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        body {
+            font-family: "Microsoft YaHei", "SimHei", Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #555;
+            margin-top: 40px;
+            border-left: 4px solid #4CAF50;
+            padding-left: 10px;
+        }
+        .info-box {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .info-item {
+            display: inline-block;
+            margin-right: 30px;
+            margin-bottom: 10px;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #666;
+        }
+        .chart-container {
+            width: 100%;
+            height: 500px;
+            margin: 30px 0;
+        }
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #999;
+            font-size: 14px;
+        }
+        details {
+            background-color: #f8f9fa;
+            border-left: 4px solid #4CAF50;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        summary {
+            cursor: pointer;
+            font-weight: bold;
+            color: #4CAF50;
+            padding: 5px 0;
+            user-select: none;
+        }
+        summary:hover {
+            color: #45a049;
+        }
+        summary::marker {
+            color: #4CAF50;
+        }
+        .analysis-content {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            line-height: 1.8;
+        }
+        .analysis-content ol {
+            padding-left: 20px;
+        }
+        .analysis-content li {
+            margin-bottom: 12px;
+            color: #444;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>000333.SZ 财务指标分析报告</h1>
+        
+        <div class="info-box">
+            <div class="info-item">
+                <span class="info-label">股票代码：</span>000333.SZ
+            </div>
+            <div class="info-item">
+                <span class="info-label">股票名称：</span>美的集团
+            </div>
+            <div class="info-item">
+                <span class="info-label">分析日期：</span>2026-03-21
+            </div>
+            <div class="info-item">
+                <span class="info-label">数据年限：</span>13期
+            </div>
+        </div>
+
+
+<h2 style="color: #C41E3A; border-bottom: 2px solid #C41E3A; padding-bottom: 10px;">指标1：回款能力 - 应收账款周转率对数 vs 毛利率</h2>
+<p style="color: #666; margin-bottom: 20px;">
+    衡量公司应收账款管理效率、回款能力与产品盈利能力的综合表现（周转率已取对数）<br>
+    <strong>计算方法：</strong><br>
+    • 应收账款周转率 = TTM营业收入 / 平均应收账款<br>
+            • 平均应收账款 = (当期应收账款 + 去年同期应收账款) / 2<br>
+            • TTM营业收入 = 最近四个季度的单季度营业收入之和<br>
+            • 报告中显示的是对数值：ln(应收账款周转率)
+</p>
+<details>
+    <summary>📊 点击展开：指标1：回款能力 - 应收账款周转率对数 vs 毛利率深度分析说明</summary>
+    <div class="analysis-content">
+        <ol>
+            <li><strong>10年数据透视：</strong>应收账款周转率在全A样本中呈对数正态分布，真实性具备保障</li><li><strong>虚增收入检验逻辑：</strong>应收账款周转率=营业收入/应收账款，通常大于1，因此如果通过虚增应收账款来虚增营业收入，分子分母同时增加相同的值，应收账款周转率大概率下降。应收账款周转率下降意味着企业在产业链上的竞争力减弱</li><li><strong>毛利率交叉验证：</strong>但是营业成本很难随营业收入等比例虚增（折旧源于历史成本，员工工资需要和社保数据对应），如果通过虚增应收账款来虚增营业收入，毛利率可能上升，这又意味着企业议价权提高，与应收账款周转率指向不一致</li><li><strong>一致性检验：</strong>因此，检验应收账款周转率和毛利率走势一致性，是重要的报表质量验证方法，不一致不一定有问题，但是需要给出合理解释</li>
+        </ol>
+    </div>
+</details>
+<h3>图1：000333.SZ - 应收账款周转率对数 vs 毛利率</h3><div id="chart_1" class="chart-container"></div><h3>图2：全A股中位数 - 应收账款周转率对数 vs 毛利率</h3><div id="chart_2" class="chart-container"></div>
+
+<h2 style="color: #C41E3A; border-bottom: 2px solid #C41E3A; padding-bottom: 10px;">指标2：再投资质量 - 长期资产周转率对数</h2>
+<p style="color: #666; margin-bottom: 20px;">
+    评估公司长期资产的使用效率和再投资质量，识别跑冒滴漏风险<br>
+    <strong>计算方法：</strong><br>
+    • 长期资产周转率 = TTM营业收入 / 平均长期经营资产<br>
+            • 平均长期经营资产 = (当期长期经营资产 + 去年同期长期经营资产) / 2<br>
+            • <strong>长期经营资产 =</strong> 非流动资产合计 - 长期股权投资 - 投资性房地产 - 递延所得税资产<br>
+            • 即：长期经营资产 = 固定资产 + 在建工程 + 生产性生物资产 + 公益性生物资产 + 油气资产 + 使用权资产 + 无形资产 + 开发支出 + 商誉 + 长期待摊费用 + 其他非流动资产<br>
+            • TTM营业收入 = 最近四个季度的单季度营业收入之和<br>
+            • 报告中显示的是对数值：ln(长期资产周转率)
+</p>
+<details>
+    <summary>📊 点击展开：指标2：再投资质量 - 长期资产周转率对数深度分析说明</summary>
+    <div class="analysis-content">
+        <ol>
+            <li><strong>10年数据透视：</strong>营业收入/(固定资产+无形资产)在全A样本中呈对数正态分布</li><li><strong>影响因素：</strong>影响固定资产周转率的因素包括单位产能造价、产能利用率、产品单价，一方面反映再投资质量，同时可以反映跑冒滴漏程度</li><li><strong>三步循环法检验：</strong>如果上市公司采用了完整的"三步循环法"一般会将虚增的利润(或者跑冒滴漏)变成了固定资产、无形资产等长期资产，再通过未来折旧或者减值消化，由于资产负债表是累积式的，周转率指标会发生趋势性下降</li><li><strong>分析要点：</strong>无论是哪种情况，固定资产+无形资产周转率下降，尤其是单个公司在全A样本中的分位数下降，都代表存量资产以及再投资质量下降，是重大的负面指标；反之则意味着资产利用效率、产业竞争力实打实改善</li>
+        </ol>
+    </div>
+</details>
+<h3>图1：000333.SZ vs 全A股中位数 - 长期资产周转率对数历史走势对比</h3><div id="chart_3" class="chart-container"></div><h3>图2：000333.SZ - 长期资产周转率对数全A股分位数排名历史</h3><div id="chart_4" class="chart-container"></div>
+
+<h2 style="color: #C41E3A; border-bottom: 2px solid #C41E3A; padding-bottom: 10px;">指标3：产业链地位 - 营运净资本比率</h2>
+<p style="color: #666; margin-bottom: 20px;">
+    评估公司在产业链中的地位和议价能力，以及资金运用效率<br>
+    <strong>计算方法：</strong><br>
+    • 营运净资本 = 应收账款 + 应收票据 + 应收款项融资 + 合同资产 - 应付账款 - 应付票据 - 合同负债<br>
+            • 营运净资本比率 = 营运净资本 / 总资产 × 100%<br>
+            • 负值表示公司占用上下游资金，正值表示被上下游占用资金
+</p>
+<details>
+    <summary>📊 点击展开：指标3：产业链地位 - 营运净资本比率深度分析说明</summary>
+    <div class="analysis-content">
+        <ol>
+            <li><strong>10年数据透视：</strong>营运净资本占总资产的比例在全A样本呈正态分布，真实性具备保障</li><li><strong>双重含义：</strong>营运净资本(应收账款+应收票据+应收款项融资+合同资产-应付账款-应付票据-合同负债)占比一方面体现上市公司资金运用效率，即不能创造收益的在途资金占比，另一方面反映公司在上下游产业链中的地位</li><li><strong>分布特征：</strong>该指标是所有指标中，全A样本分布"最正态"的一个，且全A样本中位数非常接近零</li><li><strong>龙头验证：</strong>尤其注意单个公司的该指标在全A样本中的分位数的边际变化。如果该公司在估值中的叙事是"龙头优势明显、强者恒强"，营运净资本占比在全A样本中的分位数就应该持续下降，或者绝对分位数很低，否则就是重大不一致，需要找到充足的理由解释</li>
+        </ol>
+    </div>
+</details>
+<h3>图1：000333.SZ vs 全A股中位数 - 营运净资本比率历史走势对比</h3><div id="chart_5" class="chart-container"></div><h3>图2：000333.SZ - 营运净资本比率全A股分位数排名历史</h3><div id="chart_6" class="chart-container"></div>
+
+<h2 style="color: #C41E3A; border-bottom: 2px solid #C41E3A; padding-bottom: 10px;">指标4：真实盈利能力 - 经营现金流比率</h2>
+<p style="color: #666; margin-bottom: 20px;">
+    评估公司真实的盈利能力和现金创造能力，数值越高说明盈利质量越好<br>
+    <strong>计算方法：</strong><br>
+    • 经营现金流比率 = TTM经营活动现金流量净额 / 总资产 × 100%<br>
+            • TTM经营活动现金流量净额 = 最近四个季度的单季度经营现金流之和<br>
+            • 该比率反映企业通过经营活动创造现金的能力
+</p>
+<details>
+    <summary>📊 点击展开：指标4：真实盈利能力 - 经营现金流比率深度分析说明</summary>
+    <div class="analysis-content">
+        <ol>
+            <li><strong>10年数据透视：</strong>经营性现金流量净额/总资产在全A样本呈正态分布，真实性具备保障</li><li><strong>等价ROA：</strong>经营性现金流量净额中包含财务费用，因此分母用总资产，该指标相当于ROA。如之前所述，全A样本ROE存在调节的可能性，该指标更能体现资产的现金流创造能力</li><li><strong>市场基准：</strong>2024年全A样本该指标的中位数只有4.3%，反映了A股市场加杠杆之前的"平均盈利水平"；而2025Q1分布则呈现明显的左侧厚尾(历年一季度都有这个特点)，中位数接近零，即大部分公司一季度回款一般，如果单个公司一季度回款较好，则尤为不易</li><li><strong>叙事一致性：</strong>该指标的绝对值高低本身无谓多空，而是要对比财报中的画像与估值中隐含的叙事的一致性，包括历史趋势与全A样本分位数走势</li>
+        </ol>
+    </div>
+</details>
+<h3>图1：000333.SZ vs 全A股中位数 - 经营现金流比率历史走势对比</h3><div id="chart_7" class="chart-container"></div><h3>图2：000333.SZ - 经营现金流比率全A股分位数排名历史</h3><div id="chart_8" class="chart-container"></div>
+
+
+        <div class="footer">
+            <p>本报告由财务分析系统自动生成 | 数据来源: Tushare | 市场对比: 全A股样本</p>
+        </div>
+    </div>
+    
+    <script>
+        // 图表初始化
+        
+        var chart_1;
+        (function() {
+            chart_1 = echarts.init(document.getElementById('chart_1'));
+            var option = {
+                title: {
+                    text: '000333.SZ - 应收账款周转率对数 vs 毛利率',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross'
+                    }
+                },
+                legend: {
+                    data: ['应收账款周转率对数', '毛利率'],
+                    bottom: 60,
+                    left: 'center'
+                },
+                grid: {
+                    left: '3%',
+                    right: '8%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 23.08,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 23.08,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2013年", "2014年", "2015年", "2016年", "2017年", "2018年", "2019年", "2020年", "2021年", "2022年", "2023年", "2024年", "2025Q3-TTM"],
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '应收账款周转率对数ln(次)',
+                        position: 'left',
+                        scale: true
+                    },
+                    {
+                        type: 'value',
+                        name: '毛利率%',
+                        position: 'right',
+                        scale: true
+                    }
+                ],
+                series: [{"name": "应收账款周转率对数", "type": "line", "data": [2.725127864376456, 2.716817610351229, 2.591363195827797, 2.4698667111360266, 2.6197619411577566, 2.594625202583628, 2.7018110146619043, 2.5151999466112582, 2.6283394902549193, 2.499734260738634, 2.4259853743331767, 2.4312614516956588, 2.273125507832752], "yAxisIndex": 0, "lineStyle": {"width": 3, "color": "#C41E3A"}, "itemStyle": {"color": "#C41E3A"}, "symbol": "circle", "symbolSize": 6}, {"name": "毛利率", "type": "line", "data": [23.275006694907866, 25.410427323810246, 25.843752640560986, 27.3060239962087, 25.03060655799223, 27.535598776915567, 28.863215664538828, 25.114820672679546, 22.47940915527776, 24.243844085982346, 26.49086860327546, 26.418953868553473, 25.742255381043826], "yAxisIndex": 1, "lineStyle": {"width": 3, "color": "#F5A623"}, "itemStyle": {"color": "#F5A623"}, "symbol": "circle", "symbolSize": 6}]
+            };
+            chart_1.setOption(option);
+        })();
+        
+
+        var chart_2;
+        (function() {
+            chart_2 = echarts.init(document.getElementById('chart_2'));
+            var option = {
+                title: {
+                    text: '全A股中位数 - 应收账款周转率对数 vs 毛利率',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross'
+                    }
+                },
+                legend: {
+                    data: ['应收账款周转率对数', '毛利率'],
+                    bottom: 60,
+                    left: 'center'
+                },
+                grid: {
+                    left: '3%',
+                    right: '8%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 23.08,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 23.08,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2013年", "2014年", "2015年", "2016年", "2017年", "2018年", "2019年", "2020年", "2021年", "2022年", "2023年", "2024年", "2025Q3-TTM"],
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '应收账款周转率对数ln(次)',
+                        position: 'left',
+                        scale: true
+                    },
+                    {
+                        type: 'value',
+                        name: '毛利率%',
+                        position: 'right',
+                        scale: true
+                    }
+                ],
+                series: [{"name": "应收账款周转率对数", "type": "line", "data": [1.928678024855131, 1.7830678972508156, 1.6542555173722555, 1.6359622269071754, 1.6202427829059287, 1.6100088747037171, 1.5770405766902913, 1.5639213033745323, 1.6572843444855065, 1.5694271243369866, 1.5152215881344262, 1.4749062018993895, 1.4273298272988768], "yAxisIndex": 0, "lineStyle": {"width": 3, "color": "#C41E3A", "type": "dashed"}, "itemStyle": {"color": "#C41E3A"}, "symbol": "circle", "symbolSize": 6}, {"name": "毛利率", "type": "line", "data": [23.406044131349915, 24.271030754604634, 25.552029954170607, 26.687277473865752, 27.588163410677463, 26.830458095769334, 27.473740606611564, 27.284819197582145, 25.929804720526313, 25.039263931711844, 25.0296499272266, 23.868269446225764, 23.768586391473043], "yAxisIndex": 1, "lineStyle": {"width": 3, "color": "#F5A623", "type": "dashed"}, "itemStyle": {"color": "#F5A623"}, "symbol": "circle", "symbolSize": 6}]
+            };
+            chart_2.setOption(option);
+        })();
+        
+
+        var chart_3;
+        (function() {
+            chart_3 = echarts.init(document.getElementById('chart_3'));
+            var option = {
+                title: {
+                    text: '000333.SZ vs 全A股中位数 - 长期资产周转率对数历史走势对比',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross'
+                    }
+                },
+                legend: {
+                    data: ['000333.SZ', '全A股中位数'],
+                    bottom: 60,
+                    left: 'center'
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 23.08,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 23.08,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2013年", "2014年", "2015年", "2016年", "2017年", "2018年", "2019年", "2020年", "2021年", "2022年", "2023年", "2024年", "2025Q3-TTM"],
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '长期资产周转率对数ln(次)'
+                },
+                series: [{"name": "000333.SZ", "type": "line", "data": [1.4964419136543319, 1.6463802651743222, 1.6375318313893406, 1.405066991155345, 1.249132980889612, 1.289084269950224, 1.3411585758450972, 1.2521856308637664, 1.1261258225517365, 1.0351996365033964, 0.7812935197623745, 0.7649924779474284, 0.817364726952063], "lineStyle": {"width": 3, "color": "#C41E3A"}, "itemStyle": {"color": "#C41E3A"}, "symbol": "circle", "symbolSize": 6}, {"name": "全A股中位数", "type": "line", "data": [0.6541476439058941, 0.5717228352096217, 0.4892787678597458, 0.4920419515210569, 0.6118043078297223, 0.6189361060504323, 0.6309264831047172, 0.6135927259161962, 0.6969260642407978, 0.6152382281412634, 0.5267336536408798, 0.4646021002359122, 0.9122311771339746], "lineStyle": {"width": 3, "color": "#F5A623", "type": "dashed"}, "itemStyle": {"color": "#F5A623"}, "symbol": "circle", "symbolSize": 6}]
+            };
+            chart_3.setOption(option);
+        })();
+        
+
+        var chart_4;
+        (function() {
+            chart_4 = echarts.init(document.getElementById('chart_4'));
+            var option = {
+                title: {
+                    text: '000333.SZ - 长期资产周转率对数全A股分位数排名历史',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: function(params) {
+                        return params[0].axisValue + '<br/>' +
+                               params[0].marker + ' 分位数: ' + params[0].value.toFixed(1) + '%';
+                    }
+                },
+                legend: {
+                    data: ['分位数排名'],
+                    bottom: 60,
+                    left: 'center'
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 23.08,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 23.08,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2013年", "2014年", "2015年", "2016年", "2017年", "2018年", "2019年", "2020年", "2021年", "2022年", "2023年", "2024年", "2025Q3-TTM"],
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '分位数排名 (%)',
+                    min: 0,
+                    max: 100
+                },
+                series: [{"name": "分位数排名", "type": "line", "data": [100.0, 85.73920627998255, 86.75143560295324, 83.43558282208589, 76.98061883713024, 78.30994508846858, 78.7914691943128, 77.30812013348165, 72.90737989103516, 71.31748500333259, 63.772330702118815, 65.14217538277988, 46.28164556962025], "lineStyle": {"width": 3, "color": "#4CAF50"}, "itemStyle": {"color": "#4CAF50"}, "symbol": "circle", "symbolSize": 6, "areaStyle": {"color": "rgba(76, 175, 80, 0.1)"}}]
+            };
+            
+            // 添加参考线
+            option.series.push({
+                name: '75%线',
+                type: 'line',
+                markLine: {
+                    silent: true,
+                    lineStyle: {
+                        color: 'green',
+                        type: 'dashed'
+                    },
+                    data: [{yAxis: 75, label: {formatter: '75%', position: 'end'}}]
+                }
+            });
+            option.series.push({
+                name: '50%线',
+                type: 'line',
+                markLine: {
+                    silent: true,
+                    lineStyle: {
+                        color: 'gray',
+                        type: 'dashed'
+                    },
+                    data: [{yAxis: 50, label: {formatter: '中位数', position: 'end'}}]
+                }
+            });
+            option.series.push({
+                name: '25%线',
+                type: 'line',
+                markLine: {
+                    silent: true,
+                    lineStyle: {
+                        color: 'red',
+                        type: 'dashed'
+                    },
+                    data: [{yAxis: 25, label: {formatter: '25%', position: 'end'}}]
+                }
+            });
+            
+            chart_4.setOption(option);
+        })();
+        
+
+        var chart_5;
+        (function() {
+            chart_5 = echarts.init(document.getElementById('chart_5'));
+            var option = {
+                title: {
+                    text: '000333.SZ vs 全A股中位数 - 营运净资本比率历史走势对比',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross'
+                    }
+                },
+                legend: {
+                    data: ['000333.SZ', '全A股中位数'],
+                    bottom: 60,
+                    left: 'center'
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 23.08,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 23.08,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2013年", "2014年", "2015年", "2016年", "2017年", "2018年", "2019年", "2020年", "2021年", "2022年", "2023年", "2024年", "2025Q3-TTM"],
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '营运净资本比率%'
+                },
+                series: [{"name": "000333.SZ", "type": "line", "data": [-1.7923454459555146, -5.259377758564632, -8.744307511370424, -13.458267474629693, -12.8854233444849, -10.724364764616041, -11.73327576545331, -15.30582901084157, -20.39813731445541, -15.795350623330414, -16.505064548591104, -17.268981716847655, -16.406053888557707], "lineStyle": {"width": 3, "color": "#C41E3A"}, "itemStyle": {"color": "#C41E3A"}, "symbol": "circle", "symbolSize": 6}, {"name": "全A股中位数", "type": "line", "data": [0.9885771387481167, 1.1608453493413031, 1.3184090805844468, 1.5984490435079077, 2.3763327940544627, 2.2996906883983446, 1.8609284131372186, 0.07433682996962784, 0.0, 0.268203049699559, 0.16719670205863552, 0.13151499185676183, 0.46069887591513603], "lineStyle": {"width": 3, "color": "#F5A623", "type": "dashed"}, "itemStyle": {"color": "#F5A623"}, "symbol": "circle", "symbolSize": 6}]
+            };
+            chart_5.setOption(option);
+        })();
+        
+
+        var chart_6;
+        (function() {
+            chart_6 = echarts.init(document.getElementById('chart_6'));
+            var option = {
+                title: {
+                    text: '000333.SZ - 营运净资本比率全A股分位数排名历史',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: function(params) {
+                        return params[0].axisValue + '<br/>' +
+                               params[0].marker + ' 分位数: ' + params[0].value.toFixed(1) + '%';
+                    }
+                },
+                legend: {
+                    data: ['分位数排名'],
+                    bottom: 60,
+                    left: 'center'
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 23.08,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 23.08,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2013年", "2014年", "2015年", "2016年", "2017年", "2018年", "2019年", "2020年", "2021年", "2022年", "2023年", "2024年", "2025Q3-TTM"],
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '分位数排名 (%)',
+                    min: 0,
+                    max: 100
+                },
+                series: [{"name": "分位数排名", "type": "line", "data": [33.33333333333333, 22.319093286835223, 13.330598851517639, 5.71319018404908, 6.0183611016661, 8.600182982616651, 8.168097070139096, 10.867148415786549, 6.829992576095026, 9.793471019320453, 9.155075773302885, 7.834559554583416, 8.379446640316205], "lineStyle": {"width": 3, "color": "#4CAF50"}, "itemStyle": {"color": "#4CAF50"}, "symbol": "circle", "symbolSize": 6, "areaStyle": {"color": "rgba(76, 175, 80, 0.1)"}}]
+            };
+            
+            // 添加参考线
+            option.series.push({
+                name: '75%线',
+                type: 'line',
+                markLine: {
+                    silent: true,
+                    lineStyle: {
+                        color: 'green',
+                        type: 'dashed'
+                    },
+                    data: [{yAxis: 75, label: {formatter: '75%', position: 'end'}}]
+                }
+            });
+            option.series.push({
+                name: '50%线',
+                type: 'line',
+                markLine: {
+                    silent: true,
+                    lineStyle: {
+                        color: 'gray',
+                        type: 'dashed'
+                    },
+                    data: [{yAxis: 50, label: {formatter: '中位数', position: 'end'}}]
+                }
+            });
+            option.series.push({
+                name: '25%线',
+                type: 'line',
+                markLine: {
+                    silent: true,
+                    lineStyle: {
+                        color: 'red',
+                        type: 'dashed'
+                    },
+                    data: [{yAxis: 25, label: {formatter: '25%', position: 'end'}}]
+                }
+            });
+            
+            chart_6.setOption(option);
+        })();
+        
+
+        var chart_7;
+        (function() {
+            chart_7 = echarts.init(document.getElementById('chart_7'));
+            var option = {
+                title: {
+                    text: '000333.SZ vs 全A股中位数 - 经营现金流比率历史走势对比',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross'
+                    }
+                },
+                legend: {
+                    data: ['000333.SZ', '全A股中位数'],
+                    bottom: 60,
+                    left: 'center'
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 23.08,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 23.08,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2013年", "2014年", "2015年", "2016年", "2017年", "2018年", "2019年", "2020年", "2021年", "2022年", "2023年", "2024年", "2025Q3-TTM"],
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '经营现金流比率%'
+                },
+                series: [{"name": "000333.SZ", "type": "line", "data": [10.37092179267084, 20.606933929876504, 20.772937009988247, 15.647654012414987, 9.85165150090289, 10.565399586352957, 12.780166068157234, 8.2015937378642, 9.045510094876478, 8.20196331856396, 11.913181496044764, 10.01263944167968, 9.659989872158592], "lineStyle": {"width": 3, "color": "#C41E3A"}, "itemStyle": {"color": "#C41E3A"}, "symbol": "circle", "symbolSize": 6}, {"name": "全A股中位数", "type": "line", "data": [3.8644945888681006, 4.081371242374508, 4.4281550471459585, 4.854248462839727, 3.8495892312457913, 4.457958746661506, 5.871720971194012, 5.617928720219131, 4.391907350445043, 4.308852951513579, 4.647561617206531, 4.2992235391842835, 4.500686476245434], "lineStyle": {"width": 3, "color": "#F5A623", "type": "dashed"}, "itemStyle": {"color": "#F5A623"}, "symbol": "circle", "symbolSize": 6}]
+            };
+            chart_7.setOption(option);
+        })();
+        
+
+        var chart_8;
+        (function() {
+            chart_8 = echarts.init(document.getElementById('chart_8'));
+            var option = {
+                title: {
+                    text: '000333.SZ - 经营现金流比率全A股分位数排名历史',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: function(params) {
+                        return params[0].axisValue + '<br/>' +
+                               params[0].marker + ' 分位数: ' + params[0].value.toFixed(1) + '%';
+                    }
+                },
+                legend: {
+                    data: ['分位数排名'],
+                    bottom: 60,
+                    left: 'center'
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 23.08,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 23.08,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2013年", "2014年", "2015年", "2016年", "2017年", "2018年", "2019年", "2020年", "2021年", "2022年", "2023年", "2024年", "2025Q3-TTM"],
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '分位数排名 (%)',
+                    min: 0,
+                    max: 100
+                },
+                series: [{"name": "分位数排名", "type": "line", "data": [66.66666666666666, 98.38709677419355, 98.15422477440525, 94.2101226993865, 83.88303298197893, 83.74504422079903, 86.94880142053863, 67.67648693718733, 78.7428854243999, 73.19564734621363, 87.29499688602866, 84.56949691787632, 82.01581027667984], "lineStyle": {"width": 3, "color": "#4CAF50"}, "itemStyle": {"color": "#4CAF50"}, "symbol": "circle", "symbolSize": 6, "areaStyle": {"color": "rgba(76, 175, 80, 0.1)"}}]
+            };
+            
+            // 添加参考线
+            option.series.push({
+                name: '75%线',
+                type: 'line',
+                markLine: {
+                    silent: true,
+                    lineStyle: {
+                        color: 'green',
+                        type: 'dashed'
+                    },
+                    data: [{yAxis: 75, label: {formatter: '75%', position: 'end'}}]
+                }
+            });
+            option.series.push({
+                name: '50%线',
+                type: 'line',
+                markLine: {
+                    silent: true,
+                    lineStyle: {
+                        color: 'gray',
+                        type: 'dashed'
+                    },
+                    data: [{yAxis: 50, label: {formatter: '中位数', position: 'end'}}]
+                }
+            });
+            option.series.push({
+                name: '25%线',
+                type: 'line',
+                markLine: {
+                    silent: true,
+                    lineStyle: {
+                        color: 'red',
+                        type: 'dashed'
+                    },
+                    data: [{yAxis: 25, label: {formatter: '25%', position: 'end'}}]
+                }
+            });
+            
+            chart_8.setOption(option);
+        })();
+        
+        
+        // 时间轴同步缩放 - 使用ECharts的connect功能
+        var allCharts = [chart_1, chart_2, chart_3, chart_4, chart_5, chart_6, chart_7, chart_8];
+        
+        // 使用ECharts的group功能实现图表联动
+        echarts.connect('coreIndicatorsGroup');
+        allCharts.forEach(function(chart) {
+            chart.group = 'coreIndicatorsGroup';
+        });
+        
+        // 响应式调整
+        window.addEventListener('resize', function() {
+            allCharts.forEach(function(chart) {
+                chart.resize();
+            });
+        });
+    </script>
+</body>
+</html>

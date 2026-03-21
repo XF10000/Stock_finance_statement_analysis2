@@ -4,7 +4,7 @@
 
 import argparse
 from datetime import datetime
-from financial_data_manager import FinancialDataManager
+from financial_data_manager import FinancialDataManager, normalize_stock_code
 from balance_sheet_restructure import restructure_balance_sheet
 from income_statement_restructure import restructure_income_statement
 from cashflow_statement_restructure import restructure_cashflow_statement
@@ -89,39 +89,6 @@ def add_total_share_to_balance(df_balance: pd.DataFrame, total_share_df: pd.Data
     
     return df_result
 
-
-def normalize_stock_code(ts_code: str) -> str:
-    """
-    规范化股票代码，自动补全交易所后缀
-    
-    Args:
-        ts_code: 股票代码（可以是纯数字或带后缀）
-        
-    Returns:
-        规范化后的股票代码（带交易所后缀）
-    
-    Examples:
-        '000333' -> '000333.SZ'
-        '600519' -> '600519.SH'
-        '000001.SZ' -> '000001.SZ'
-    """
-    # 如果已经有后缀，直接返回
-    if '.' in ts_code:
-        return ts_code.upper()
-    
-    # 补全代码到6位数字
-    code = ts_code.zfill(6)
-    
-    # 根据代码开头判断交易所
-    # 深圳：000、002、003、300开头
-    # 上海：600、601、603、605、688开头
-    if code.startswith(('000', '002', '003', '300')):
-        return f"{code}.SZ"
-    elif code.startswith(('600', '601', '603', '605', '688')):
-        return f"{code}.SH"
-    else:
-        # 默认深圳（兼容其他代码）
-        return f"{code}.SZ"
 
 
 def main():
@@ -235,9 +202,16 @@ def main():
     if data.get('income') is not None and len(data['income']) > 0:
         print(f"\n重构利润表（股权价值增加表）...")
         try:
-            # 使用默认股权资本成本率
-            equity_cost_rate = 0.08  # 默认8%
-            print(f"  股权资本成本率: {equity_cost_rate*100}%")
+            # 从 config.yaml 读取股权资本成本率，缺失时默认 8%
+            equity_cost_rate = 0.08
+            config_path = args.db_path.replace('database/financial_data.db', 'config.yaml')
+            if not os.path.isabs(config_path):
+                config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yaml')
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    _cfg = yaml.safe_load(f) or {}
+                equity_cost_rate = _cfg.get('restructure', {}).get('equity_cost_rate', 0.08)
+            print(f"  股权资本成本率: {equity_cost_rate*100:.1f}%")
             
             # 获取原始利润表数据并转置
             df_income = data['income'].copy()
@@ -423,7 +397,7 @@ def main():
         print("="*60)
         
         try:
-            from html_report_generator import HTMLReportGenerator
+            from html_report_generator import FinancialStatementsReportGenerator
             
             # 检查是否有年报+TTM数据
             balance_ttm = data.get('balance_sheet_annual_ttm')
@@ -431,19 +405,14 @@ def main():
             cashflow_ttm = data.get('cashflow_statement_annual_ttm')
             
             if balance_ttm is not None and income_ttm is not None and cashflow_ttm is not None:
-                # 获取公司名称（从股票代码推断，或使用默认值）
-                company_name_map = {
-                    '000333.SZ': '美的集团',
-                    '600900.SH': '长江电力',
-                    '603345.SH': '安井食品',
-                    '601898.SH': '中煤能源',
-                    '601088.SH': '中国神华'
-                }
-                company_name = company_name_map.get(ts_code, ts_code.split('.')[0])
+                # 从数据库 stock_list 查询公司名称，查不到则使用股票代码前缀
+                _stocks = db_manager.get_all_stocks()
+                _name_map = {s['ts_code']: s['name'] for s in _stocks if s.get('name')}
+                company_name = _name_map.get(ts_code, ts_code.split('.')[0])
                 
                 # 生成HTML报告
                 html_filename = os.path.join(args.output_dir, f"{ts_code}_financial_report.html")
-                generator = HTMLReportGenerator(company_name=company_name, stock_code=ts_code)
+                generator = FinancialStatementsReportGenerator(company_name=company_name, stock_code=ts_code)
                 generator.generate_report(
                     balance_ttm, income_ttm, cashflow_ttm,
                     output_path=html_filename
@@ -568,9 +537,9 @@ def main():
     print("="*60)
     
     try:
-        from final_report_generator_echarts import FinalReportGenerator
+        from final_report_generator_echarts import CoreIndicatorsReportGenerator
         
-        core_generator = FinalReportGenerator()
+        core_generator = CoreIndicatorsReportGenerator()
         
         # 生成报告，使用新的文件名格式
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')

@@ -1,2 +1,63 @@
-DEBUG    financial_data_manager:financial_data_manager.py:62 线程 MainThread 创建数据库连接
-INFO     financial_data_manager:financial_data_manager.py:223 数据库初始化完成
+INFO     core_indicators_analyzer:core_indicators_analyzer.py:76 找到 4 个有效报告期
+INFO     core_indicators_analyzer:core_indicators_analyzer.py:136 成功计算 4 期指标
+INFO     core_indicators_analyzer:core_indicators_analyzer.py:76 找到 1 个有效报告期
+INFO     core_indicators_analyzer:core_indicators_analyzer.py:136 成功计算 1 期指标
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:258 数据库初始化完成
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:258 数据库初始化完成
+INFO     core_indicators_analyzer:core_indicators_analyzer.py:76 找到 4 个有效报告期
+INFO     core_indicators_analyzer:core_indicators_analyzer.py:136 成功计算 4 期指标
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:258 数据库初始化完成
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:258 数据库初始化完成
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:258 数据库初始化完成
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:258 数据库初始化完成
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:258 数据库初始化完成
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:258 数据库初始化完成
+INFO     financial_data_analyzer:financial_data_analyzer.py:71 计算 20231231 的市场分位数...
+INFO     financial_data_analyzer:financial_data_analyzer.py:89 找到 10 只股票的数据
+INFO     financial_data_analyzer:financial_data_analyzer.py:136 应收账款周转率对数: 均值=2.45, 中位数=2.45, 样本数=10
+INFO     financial_data_analyzer:financial_data_analyzer.py:136 毛利率: 均值=29.00, 中位数=29.00, 样本数=10
+INFO     financial_data_analyzer:financial_data_analyzer.py:136 长期经营资产周转率对数: 均值=1.73, 中位数=1.73, 样本数=10
+INFO     financial_data_analyzer:financial_data_analyzer.py:136 净营运资本比率: 均值=0.39, 中位数=0.39, 样本数=10
+INFO     financial_data_analyzer:financial_data_analyzer.py:136 经营现金流比率: 均值=6.25, 中位数=6.25, 样本数=10
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:258 数据库初始化完成
+INFO     financial_data_analyzer:financial_data_analyzer.py:163 更新 20231231 的分位数排名...
+INFO     financial_data_analyzer:financial_data_analyzer.py:218 成功更新 5 只股票的分位数排名
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:258 数据库初始化完成
+INFO     financial_data_analyzer:financial_data_analyzer.py:71 计算 20991231 的市场分位数...
+WARNING  financial_data_analyzer:financial_data_analyzer.py:86 20991231 没有找到任何指标数据
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:258 数据库初始化完成
+INFO     financial_data_analyzer:financial_data_analyzer.py:71 计算 20231231 的市场分位数...
+INFO     financial_data_analyzer:financial_data_analyzer.py:89 找到 10 只股票的数据
+INFO     financial_data_analyzer:financial_data_analyzer.py:136 应收账款周转率对数: 均值=5.50, 中位数=5.50, 样本数=10
+INFO     financial_data_analyzer:financial_data_analyzer.py:136 毛利率: 均值=55.00, 中位数=55.00, 样本数=10
+INFO     financial_data_analyzer:financial_data_analyzer.py:136 长期经营资产周转率对数: 均值=1.00, 中位数=1.00, 样本数=10
+INFO     financial_data_analyzer:financial_data_analyzer.py:136 净营运资本比率: 均值=0.50, 中位数=0.50, 样本数=10
+INFO     financial_data_analyzer:financial_data_analyzer.py:136 经营现金流比率: 均值=5.00, 中位数=5.00, 样本数=10
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:258 数据库初始化完成
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:258 数据库初始化完成
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:258 数据库初始化完成
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:258 数据库初始化完成
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:258 数据库初始化完成
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 MainThread 创建数据库连接
+INFO     financial_data_manager:financial_data_manager.py:258 数据库初始化完成
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 Thread-1 (write_data) 创建数据库连接
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 Thread-2 (write_data) 创建数据库连接
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 Thread-3 (write_data) 创建数据库连接
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 Thread-5 (write_data) 创建数据库连接
+DEBUG    financial_data_manager:financial_data_manager.py:63 线程 Thread-4 (write_data) 创建数据库连接

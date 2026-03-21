@@ -11,7 +11,7 @@ from datetime import datetime
 import os
 
 
-class HTMLReportGenerator:
+class FinancialStatementsReportGenerator:
     """HTML财务报告生成器"""
     
     # 配色方案（与样例图表一致）
@@ -2290,5 +2290,5 @@ if __name__ == '__main__':
     # 测试代码
     print("HTML报告生成器模块已加载")
     print("使用示例:")
-    print("  generator = HTMLReportGenerator('美的集团', '000333.SZ')")
+    print("  generator = FinancialStatementsReportGenerator('美的集团', '000333.SZ')")
     print("  generator.generate_report(balance_data, income_data, cashflow_data)")

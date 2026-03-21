@@ -11,8 +11,8 @@ class TestMarketAnalyzer:
     @pytest.fixture
     def analyzer(self, populated_db):
         """创建市场分析器实例"""
-        from market_analyzer import MarketAnalyzer
-        return MarketAnalyzer(populated_db)
+        from financial_data_analyzer import FinancialDataAnalyzer
+        return FinancialDataAnalyzer(populated_db)
     
     def test_calculate_market_percentiles(self, analyzer, populated_db):
         """测试计算市场分位数"""
@@ -90,8 +90,8 @@ class TestMarketAnalyzerStatistics:
     
     @pytest.fixture
     def analyzer(self, populated_db):
-        from market_analyzer import MarketAnalyzer
-        return MarketAnalyzer(populated_db)
+        from financial_data_analyzer import FinancialDataAnalyzer
+        return FinancialDataAnalyzer(populated_db)
     
     def test_percentile_calculation_accuracy(self, analyzer, populated_db):
         """测试分位数计算准确性"""

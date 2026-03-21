@@ -7,13 +7,12 @@ import math
 import pandas as pd
 import json
 from datetime import datetime
-import sqlite3
 from financial_data_manager import FinancialDataManager
 from core_indicators_analyzer import CoreIndicatorsAnalyzer
 from financial_data_analyzer import FinancialDataAnalyzer
 
 
-class FinalReportGenerator:
+class CoreIndicatorsReportGenerator:
     """核心指标报告生成器（ECharts版本）"""
     
     def __init__(self, db_path: str = 'database/financial_data.db'):
@@ -145,15 +144,13 @@ class FinalReportGenerator:
     
     def _get_stock_info(self, ts_code: str):
         """获取股票基本信息"""
-        conn = sqlite3.connect(self.db.db_path)
+        conn = self.db.get_connection()
         cursor = conn.cursor()
         
         row = cursor.execute(
             "SELECT ts_code, name, market, list_date FROM stock_list WHERE ts_code = ?",
             (ts_code,)
         ).fetchone()
-        
-        conn.close()
         
         if row is None:
             return {'ts_code': ts_code, 'name': '未知', 'market': '未知', 'list_date': '未知'}

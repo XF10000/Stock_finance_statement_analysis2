@@ -46,6 +46,14 @@ class CoreIndicatorsAnalyzer:
         Returns:
             包含所有指标的DataFrame
         """
+        # 如果任一输入为空，直接返回空结果
+        if balance_sheet is None or len(balance_sheet) == 0:
+            return pd.DataFrame()
+        if income_statement is None or len(income_statement) == 0:
+            return pd.DataFrame()
+        if cashflow_statement is None or len(cashflow_statement) == 0:
+            return pd.DataFrame()
+        
         # 确保所有列名都是字符串类型（避免整数列名导致的匹配失败）
         balance_sheet = balance_sheet.copy()
         balance_sheet.columns = [str(col) for col in balance_sheet.columns]
@@ -137,18 +145,23 @@ class CoreIndicatorsAnalyzer:
     ) -> set:
         """获取三大报表都有数据的报告期"""
         
-        # 获取日期列名
-        date_col = self._get_date_column(balance_sheet)
+        def _safe_get_dates(df: pd.DataFrame) -> set:
+            if df is None or len(df) == 0:
+                return set()
+            try:
+                col = self._get_date_column(df)
+                return set(df[col].unique())
+            except (ValueError, KeyError):
+                return set()
         
-        # 获取各报表的报告期
-        balance_dates = set(balance_sheet[date_col].unique())
-        income_dates = set(income_statement[date_col].unique())
-        cashflow_dates = set(cashflow_statement[date_col].unique())
+        balance_dates = _safe_get_dates(balance_sheet)
+        income_dates = _safe_get_dates(income_statement)
+        cashflow_dates = _safe_get_dates(cashflow_statement)
         
-        # 取交集
-        common_dates = balance_dates & income_dates & cashflow_dates
+        if not balance_dates or not income_dates or not cashflow_dates:
+            return set()
         
-        return common_dates
+        return balance_dates & income_dates & cashflow_dates
     
     def _get_date_column(self, df: pd.DataFrame) -> str:
         """获取日期列名"""

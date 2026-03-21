@@ -1,0 +1,2318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>美的集团 (000333.SZ) 财务分析报告</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #5B9BD5;
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .header .subtitle {
+            font-size: 16px;
+            color: #666;
+        }
+        
+        .section {
+            margin-bottom: 50px;
+        }
+        
+        .section-title {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 20px;
+            padding-left: 15px;
+            border-left: 4px solid #5B9BD5;
+        }
+        
+        .chart-container {
+            margin-bottom: 40px;
+            padding: 20px;
+            background-color: #fafafa;
+            border-radius: 4px;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #999;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>美的集团 (000333.SZ)</h1>
+            <div class="subtitle">财务分析报告 | 生成时间: 2026-03-21 16:39:24</div>
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">一、资产负债分析</h2>
+            
+            <div class="chart-container">
+                <div id="chart_assets_composition" style="width: 100%; height: 500px;"></div>
+            </div>
+
+            <div class="chart-container">
+                <div id="chart_capital_structure" style="width: 100%; height: 500px;"></div>
+            </div>
+
+            <div class="chart-container">
+                <div id="chart_long_term_assets" style="width: 100%; height: 500px;"></div>
+            </div>
+
+            <div class="chart-container">
+                <div id="chart_working_capital_ratio" style="width: 100%; height: 500px;"></div>
+            </div>
+
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">二、利润分析</h2>
+            
+            <div class="chart-container">
+                <div id="chart_revenue_profit" style="width: 100%; height: 500px;"></div>
+            </div>
+
+            <div class="chart-container">
+                <div id="chart_ebit" style="width: 100%; height: 500px;"></div>
+            </div>
+
+            <div class="chart-container">
+                <div id="chart_operating_expenses" style="width: 100%; height: 500px;"></div>
+            </div>
+
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">三、经营效率分析</h2>
+            
+            <div class="chart-container">
+                <div id="chart_roic" style="width: 100%; height: 500px;"></div>
+            </div>
+
+            <div class="chart-container">
+                <div id="chart_roe_roic" style="width: 100%; height: 500px;"></div>
+            </div>
+
+            <div class="chart-container">
+                <div id="chart_asset_efficiency" style="width: 100%; height: 500px;"></div>
+            </div>
+
+            <div class="chart-container">
+                <div id="chart_turnover_days" style="width: 100%; height: 500px;"></div>
+            </div>
+
+            <div class="chart-container">
+                <div id="chart_turnover_ratio" style="width: 100%; height: 500px;"></div>
+            </div>
+
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">四、财务成本分析</h2>
+            
+            <div class="chart-container">
+                <div id="chart_finance_cost_burden" style="width: 100%; height: 500px;"></div>
+            </div>
+
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">五、长期资产投资和并购活动分析</h2>
+            
+            <div class="chart-container">
+                <div id="chart_capex_analysis" style="width: 100%; height: 500px;"></div>
+            </div>
+
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">六、投资收益分析</h2>
+            
+            <div class="chart-container">
+                <div id="chart_investment_income" style="width: 100%; height: 500px;"></div>
+            </div>
+
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">七、自由现金流分析</h2>
+            
+            <div class="chart-container">
+                <div id="chart_fcff_ebit" style="width: 100%; height: 500px;"></div>
+            </div>
+
+            <div class="chart-container">
+                <div id="chart_fcfe_dividend" style="width: 100%; height: 500px;"></div>
+            </div>
+
+        </div>
+        
+        <div class="footer">
+            <p>本报告由财务分析系统自动生成 | 数据来源: Tushare</p>
+        </div>
+    </div>
+    
+    <script>
+        // 图表初始化
+        
+        var chart_chart_assets_composition;
+        (function() {
+            chart_chart_assets_composition = echarts.init(document.getElementById('chart_assets_composition'));
+            var option_chart_assets_composition = {
+                title: {
+                    text: '资产变化及类别组成比例',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: {
+                            color: '#999'
+                        }
+                    },
+                    formatter: function(params) {
+                        var result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            var value = item.value;
+                            var formattedValue;
+                            // 判断是否为百分比系列（通过系列名称判断）
+                            if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {
+                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                            } else {
+                                formattedValue = value != null ? value.toFixed(0) : '-';
+                            }
+                            result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ["金融资产合计", "长期股权投资", "周转性经营投入合计", "长期经营资产合计"],
+                    bottom: 60,
+                    textStyle: {
+                        fontSize: 12
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2012/12/31", "2013/12/31", "2014/12/31", "2015/12/31", "2016/12/31", "2017/12/31", "2018/12/31", "2019/12/31", "2020/12/31", "2021/12/31", "2022/12/31", "2023/12/31", "2024/12/31", "2025Q3-TTM"],
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '亿元',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'right',
+                        axisLabel: {
+                            formatter: function(value) {
+                                return value.toFixed(0);
+                            }
+                        }
+                    }
+                ],
+                series: [{"name": "金融资产合计", "type": "bar", "data": [null, 165.660154, 82.3886949, 154.61556, 232.90737, 508.7938, 304.0712, 751.41147, 1362.53292, 1137.15877, 1200.37346, 1118.98932, 2116.77159, 2196.5447], "itemStyle": {"color": "#5B9BD5"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%", "label": {"show": true, "position": "inside", "formatter": "__FORMATTER_INT__"}}, {"name": "长期股权投资", "type": "bar", "data": [null, 17.5579809, 9.5187439, 28.88274, 22.11732, 26.33698, 27.13316, 27.90806, 29.01337, 37.96705, 51.88817, 49.76109, 52.23478, 51.23891], "itemStyle": {"color": "#A5A5A5"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%", "label": {"show": true, "position": "inside", "formatter": "__FORMATTER_INT__"}}, {"name": "周转性经营投入合计", "type": "bar", "data": [null, -48.7334851, 40.397827, 17.3435, -61.13278, -109.42322, 177.42744, -66.99994, -552.8083, -612.32327, -455.21937, -584.94674, -1090.22492, -1539.4796], "itemStyle": {"color": "#ED7D31"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%", "label": {"show": true, "position": "inside", "formatter": "__FORMATTER_INT__"}}, {"name": "长期经营资产合计", "type": "bar", "data": [null, 295.3279376, 310.6009229, 291.04734, 402.19964, 690.7556, 715.42862, 739.78297, 832.37649, 1138.99616, 1277.40816, 1779.96536, 1986.39412, 2079.65665], "itemStyle": {"color": "#FFC000"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%", "label": {"show": true, "position": "inside", "formatter": "__FORMATTER_INT__"}}]
+            };
+            
+            // 替换formatter标记为真正的JavaScript函数
+            option_chart_assets_composition.series.forEach(function(s) {
+                if (s.label && s.label.formatter) {
+                    if (s.label.formatter === '__FORMATTER_PERCENT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_DECIMAL__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_INT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(0) : '';
+                        };
+                    }
+                }
+            });
+            
+            chart_chart_assets_composition.setOption(option_chart_assets_composition);
+        })();
+        
+
+        var chart_chart_capital_structure;
+        (function() {
+            chart_chart_capital_structure = echarts.init(document.getElementById('chart_capital_structure'));
+            var option_chart_capital_structure = {
+                title: {
+                    text: '资本期限分析',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: {
+                            color: '#999'
+                        }
+                    },
+                    formatter: function(params) {
+                        var result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            var value = item.value;
+                            var formattedValue;
+                            // 判断是否为百分比系列（通过系列名称判断）
+                            if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {
+                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                            } else {
+                                formattedValue = value != null ? value.toFixed(0) : '-';
+                            }
+                            result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ["短期债务", "长期债务", "所有者权益合计"],
+                    bottom: 60,
+                    textStyle: {
+                        fontSize: 12
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2012/12/31", "2013/12/31", "2014/12/31", "2015/12/31", "2016/12/31", "2017/12/31", "2018/12/31", "2019/12/31", "2020/12/31", "2021/12/31", "2022/12/31", "2023/12/31", "2024/12/31", "2025Q3-TTM"],
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '亿元',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'right',
+                        axisLabel: {
+                            formatter: function(value) {
+                                return value.toFixed(1) + "%";
+                            }
+                        }
+                    }
+                ],
+                series: [{"name": "短期债务", "type": "bar", "data": [null, 106.6039723, 67.8814571, 46.67437, 33.3086, 30.14866, 89.88393, 72.51532, 165.0287, 347.43823, 143.02952, 249.70188, 743.14262, 386.3781], "itemStyle": {"color": "#5B9BD5"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%", "label": {"show": true, "position": "inside", "formatter": "__FORMATTER_INT__"}}, {"name": "长期债务", "type": "bar", "data": [null, 9.1625519, 10.2405682, 0.90561, 74.42403, 377.89915, 321.80329, 413.32023, 428.40547, 212.67572, 553.57044, 514.04024, 155.8379, 177.24287], "itemStyle": {"color": "#ED7D31"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%", "label": {"show": true, "position": "inside", "formatter": "__FORMATTER_INT__"}}, {"name": "所有者权益合计", "type": "bar", "data": [null, 395.0882515, 458.2525427, 561.50473, 690.82337, 830.20488, 925.65712, 1074.96097, 1242.371, 1348.25075844, 1519.23802076, 1742.99649025, 2276.67390883, 2341.07699544], "itemStyle": {"color": "#A5A5A5"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%", "label": {"show": true, "position": "inside", "formatter": "__FORMATTER_INT__"}}]
+            };
+            
+            // 替换formatter标记为真正的JavaScript函数
+            option_chart_capital_structure.series.forEach(function(s) {
+                if (s.label && s.label.formatter) {
+                    if (s.label.formatter === '__FORMATTER_PERCENT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_DECIMAL__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_INT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(0) : '';
+                        };
+                    }
+                }
+            });
+            
+            chart_chart_capital_structure.setOption(option_chart_capital_structure);
+        })();
+        
+
+        var chart_chart_long_term_assets;
+        (function() {
+            chart_chart_long_term_assets = echarts.init(document.getElementById('chart_long_term_assets'));
+            var option_chart_long_term_assets = {
+                title: {
+                    text: '长期经营资产变化',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: {
+                            color: '#999'
+                        }
+                    },
+                    formatter: function(params) {
+                        var result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            var value = item.value;
+                            var formattedValue;
+                            // 判断是否为百分比系列（通过系列名称判断）
+                            if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {
+                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                            } else {
+                                formattedValue = value != null ? value.toFixed(0) : '-';
+                            }
+                            result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ["固定资产合计", "在建工程合计", "生产性生物资产", "油气资产", "使用权资产", "无形资产", "开发支出", "商誉", "长期待摊费用", "其他非流动资产", "递延所得税资产", "递延所得税负债(减项)"],
+                    bottom: 60,
+                    textStyle: {
+                        fontSize: 12
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2012/12/31", "2013/12/31", "2014/12/31", "2015/12/31", "2016/12/31", "2017/12/31", "2018/12/31", "2019/12/31", "2020/12/31", "2021/12/31", "2022/12/31", "2023/12/31", "2024/12/31", "2025Q3-TTM"],
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '亿元',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'right',
+                        axisLabel: {
+                            formatter: function(value) {
+                                return value.toFixed(0);
+                            }
+                        }
+                    }
+                ],
+                series: [{"name": "固定资产合计", "type": "bar", "data": [null, 195.7216132, 195.2181406, 187.29881, 210.56791, 226.00724, 224.37212, 216.64682, 222.39214, 228.52848, 260.82992, 309.37963, 335.28908, 431.19843], "itemStyle": {"color": "#E6E6FA"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "在建工程合计", "type": "bar", "data": [null, 6.1260128, 6.6188229, 9.54761, 5.80729, 8.79576, 20.77621, 11.9465, 14.77302, 26.9093, 38.43777, 46.8122, 53.63977, 27.80199], "itemStyle": {"color": "#D8BFD8"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "生产性生物资产", "type": "bar", "data": [null, null, null, null, null, null, null, null, null, null, null, null, null, null], "itemStyle": {"color": "#8A2BE2"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "油气资产", "type": "bar", "data": [null, null, null, null, null, null, null, null, null, null, null, null, null, null], "itemStyle": {"color": "#FF7F50"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "使用权资产", "type": "bar", "data": [null, null, null, null, null, null, null, null, null, 22.97354, 23.39878, 30.48785, 27.71967, 31.87045], "itemStyle": {"color": "#FFDAB9"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "无形资产", "type": "bar", "data": [null, 33.257384, 34.3195812, 33.92402, 68.68538, 151.67036, 161.86675, 154.84179, 154.22393, 171.73072, 169.08915, 184.57736, 170.08978, 216.56208], "itemStyle": {"color": "#FF8C00"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "开发支出", "type": "bar", "data": [null, null, null, null, null, null, null, null, null, null, null, null, null, 0.25094], "itemStyle": {"color": "#0077BE"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "商誉", "type": "bar", "data": [null, 29.3100359, 29.3179141, 23.93066, 57.30995, 289.03785, 291.0039, 282.07065, 295.57218, 278.74752, 285.48653, 308.58237, 295.81014, 343.66382], "itemStyle": {"color": "#008ECC"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "长期待摊费用", "type": "bar", "data": [null, 6.4788234, 7.585761, 7.81359, 6.25971, 8.59106, 11.91373, 12.67127, 13.00962, 13.9424, 15.79899, 17.36199, 18.64261, 20.49868], "itemStyle": {"color": "#00A6D6"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "其他非流动资产", "type": "bar", "data": [null, null, null, 6.6973, 41.5853, 6.14822, 5.50352, 49.47603, 112.55879, 363.74356, 428.40079, 806.03526, 993.42844, 921.01591], "itemStyle": {"color": "#4BC0D9"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "递延所得税资产", "type": "bar", "data": [null, 25.6720445, 37.7998755, 22.23999, 30.30383, 40.23334, 44.21313, 57.68993, 72.08635, 81.92309, 102.44296, 127.7115, 140.74278, 147.97959], "itemStyle": {"color": "#7ED5EA"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "递延所得税负债(减项)", "type": "bar", "data": [null, 1.2379762, 0.2591724, 0.40464, 18.31973, 39.72823, 44.22074, 45.56002, 52.23954, 49.50245, 46.47673, 50.9828, 48.96815, 60.9343], "itemStyle": {"color": "#ADD8E6"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}]
+            };
+            
+            // 替换formatter标记为真正的JavaScript函数
+            option_chart_long_term_assets.series.forEach(function(s) {
+                if (s.label && s.label.formatter) {
+                    if (s.label.formatter === '__FORMATTER_PERCENT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_DECIMAL__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_INT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(0) : '';
+                        };
+                    }
+                }
+            });
+            
+            chart_chart_long_term_assets.setOption(option_chart_long_term_assets);
+        })();
+        
+
+        var chart_chart_working_capital_ratio;
+        (function() {
+            chart_chart_working_capital_ratio = echarts.init(document.getElementById('chart_working_capital_ratio'));
+            var option_chart_working_capital_ratio = {
+                title: {
+                    text: '经营资本-营业收入比例',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: {
+                            color: '#999'
+                        }
+                    },
+                    formatter: function(params) {
+                        var result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            var value = item.value;
+                            var formattedValue;
+                            // 判断是否为百分比系列（通过系列名称判断）
+                            if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {
+                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                            } else {
+                                formattedValue = value != null ? value.toFixed(0) : '-';
+                            }
+                            result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ["周转性经营投入合计", "存货", "营业收入", "经营资本-营业收入比例", "存货-营业收入比例"],
+                    bottom: 60,
+                    textStyle: {
+                        fontSize: 12
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2012/12/31", "2013/12/31", "2014/12/31", "2015/12/31", "2016/12/31", "2017/12/31", "2018/12/31", "2019/12/31", "2020/12/31", "2021/12/31", "2022/12/31", "2023/12/31", "2024/12/31", "2025Q3-TTM"],
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '亿元',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'right',
+                        axisLabel: {
+                            formatter: function(value) {
+                                return value.toFixed(1) + "%";
+                            }
+                        }
+                    }
+                ],
+                series: [{"name": "周转性经营投入合计", "type": "bar", "data": [null, -48.7334851, 40.397827, 17.3435, -61.13278, -109.42322, 177.42744, -66.99994, -552.8083, -612.32327, -455.21937, -584.94674, -1090.22492, -1539.4796], "itemStyle": {"color": "#ED7D31"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "存货", "type": "bar", "data": [null, 151.9772384, 150.2003026, 104.48937, 156.26897, 294.44166, 296.45018, 324.43399, 310.76529, 459.24439, 460.44897, 473.39255, 633.39188, 480.46649], "itemStyle": {"color": "#FFC000"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "营业收入", "type": "bar", "data": [null, 1209.7500314, 1416.6817516, 1384.41226, 1590.44041, 2407.12301, 2596.6482, 2782.16017, 2842.21249, 3412.33208, 3439.17531, 3720.3728, 4071.496, 4512.3169], "itemStyle": {"color": "#5B9BD5"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "经营资本-营业收入比例", "type": "line", "data": [null, -4.028392960122721, 2.8515809534762977, 1.2527698938465048, -3.843764256467804, -4.54580923141107, 6.832941019888638, -2.4081985186352513, -19.44992860122151, -17.944422044644607, -13.236294430131856, -15.722799070028682, -26.777010710559463, -34.11727576137217], "itemStyle": {"color": "#A5A5A5"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}, {"name": "存货-营业收入比例", "type": "line", "data": [null, 12.562697619782018, 10.602261406301295, 7.547561735692805, 9.825515562698763, 12.232098599730474, 11.41664781544146, 11.66122617591783, 10.933921763182457, 13.458373312834196, 13.388354140051092, 12.7243310132791, 15.556735902479089, 10.64788889273269], "itemStyle": {"color": "#FFC000"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}]
+            };
+            
+            // 替换formatter标记为真正的JavaScript函数
+            option_chart_working_capital_ratio.series.forEach(function(s) {
+                if (s.label && s.label.formatter) {
+                    if (s.label.formatter === '__FORMATTER_PERCENT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_DECIMAL__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_INT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(0) : '';
+                        };
+                    }
+                }
+            });
+            
+            chart_chart_working_capital_ratio.setOption(option_chart_working_capital_ratio);
+        })();
+        
+
+        var chart_chart_revenue_profit;
+        (function() {
+            chart_chart_revenue_profit = echarts.init(document.getElementById('chart_revenue_profit'));
+            var option_chart_revenue_profit = {
+                title: {
+                    text: '毛利、净利、营收、成本趋势',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: {
+                            color: '#999'
+                        }
+                    },
+                    formatter: function(params) {
+                        var result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            var value = item.value;
+                            var formattedValue;
+                            // 判断是否为百分比系列（通过系列名称判断）
+                            if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {
+                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                            } else {
+                                formattedValue = value != null ? value.toFixed(0) : '-';
+                            }
+                            result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ["营业收入", "营业成本", "毛利", "净利润", "毛利率", "净利润率"],
+                    bottom: 60,
+                    textStyle: {
+                        fontSize: 12
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2012/12/31", "2013/12/31", "2014/12/31", "2015/12/31", "2016/12/31", "2017/12/31", "2018/12/31", "2019/12/31", "2020/12/31", "2021/12/31", "2022/12/31", "2023/12/31", "2024/12/31", "2025Q3-TTM"],
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '亿元',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'right',
+                        axisLabel: {
+                            formatter: function(value) {
+                                return value.toFixed(1) + "%";
+                            }
+                        }
+                    }
+                ],
+                series: [{"name": "营业收入", "type": "bar", "data": [null, 1209.7500314, 1416.6817516, 1384.41226, 1590.44041, 2407.12301, 2596.6482, 2782.16017, 2842.21249, 3412.33208, 3439.17531, 3720.3728, 4071.496, 4512.3169], "itemStyle": {"color": "#5B9BD5"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "营业成本", "type": "bar", "data": [null, 928.1806306, 1056.6968647, 1026.62818, 1156.15437, 1804.60552, 1881.64557, 1979.13928, 2128.39592, 2645.25999, 2605.38701, 2734.81373, 2995.84935, 3350.74476], "itemStyle": {"color": "#A5A5A5"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "毛利", "type": "bar", "data": [null, 281.5694008, 359.9848869, 357.78408, 434.28604, 602.51749, 715.00263, 803.02089, 713.81657, 767.07209, 833.7883, 985.55907, 1075.64665, 1161.57214], "itemStyle": {"color": "#70AD47"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "净利润", "type": "bar", "data": [null, 80.4496047, 108.132667, 128.13055, 166.94913, 173.47609, 184.72483, 245.94946, 249.52393, 267.50534, 299.6912, 318.58603, 361.08607, 435.45181], "itemStyle": {"color": "#FFC000"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "毛利率", "type": "line", "data": [null, 23.275006694907866, 25.410427323810246, 25.843752640560986, 27.3060239962087, 25.03060655799223, 27.535598776915567, 28.863215664538828, 25.114820672679546, 22.47940915527776, 24.243844085982346, 26.49086860327546, 26.418953868553473, 25.742255381043826], "itemStyle": {"color": "#FF0000"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}, {"name": "净利润率", "type": "line", "data": [null, 6.650101476492509, 7.632812865548313, 9.255230808198709, 10.497037735604316, 7.206781260422582, 7.113972158415607, 8.840233666345673, 8.779214463307069, 7.839370076783382, 8.714042553416679, 8.563282421589578, 8.868633789643905, 9.65029317865507], "itemStyle": {"color": "#ED7D31"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}]
+            };
+            
+            // 替换formatter标记为真正的JavaScript函数
+            option_chart_revenue_profit.series.forEach(function(s) {
+                if (s.label && s.label.formatter) {
+                    if (s.label.formatter === '__FORMATTER_PERCENT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_DECIMAL__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_INT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(0) : '';
+                        };
+                    }
+                }
+            });
+            
+            chart_chart_revenue_profit.setOption(option_chart_revenue_profit);
+        })();
+        
+
+        var chart_chart_ebit;
+        (function() {
+            chart_chart_ebit = echarts.init(document.getElementById('chart_ebit'));
+            var option_chart_ebit = {
+                title: {
+                    text: '息税前经营收入利润EBIT、利润率',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: {
+                            color: '#999'
+                        }
+                    },
+                    formatter: function(params) {
+                        var result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            var value = item.value;
+                            var formattedValue;
+                            // 判断是否为百分比系列（通过系列名称判断）
+                            if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {
+                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                            } else {
+                                formattedValue = value != null ? value.toFixed(0) : '-';
+                            }
+                            result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ["营业收入", "息税前经营利润", "息税前经营利润率"],
+                    bottom: 60,
+                    textStyle: {
+                        fontSize: 12
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2012/12/31", "2013/12/31", "2014/12/31", "2015/12/31", "2016/12/31", "2017/12/31", "2018/12/31", "2019/12/31", "2020/12/31", "2021/12/31", "2022/12/31", "2023/12/31", "2024/12/31", "2025Q3-TTM"],
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '亿元',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'right',
+                        axisLabel: {
+                            formatter: function(value) {
+                                return value.toFixed(1) + "%";
+                            }
+                        }
+                    }
+                ],
+                series: [{"name": "营业收入", "type": "bar", "data": [null, 1209.7500314, 1416.6817516, 1384.41226, 1590.44041, 2407.12301, 2596.6482, 2782.16017, 2842.21249, 3412.33208, 3439.17531, 3720.3728, 4071.496, 4512.3169], "itemStyle": {"color": "#5B9BD5"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "息税前经营利润", "type": "bar", "data": [null, 89.4661298, 131.4708272, 137.55269, 161.50073, 199.12594, 218.91031, 251.41945, 235.23755, 251.0453, 298.77524, 351.41146, 386.85787, 429.07058], "itemStyle": {"color": "#ED7D31"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "息税前经营利润率", "type": "line", "data": [null, 7.3954228127991115, 9.280194867444074, 9.935818540064071, 10.154465957011242, 8.27236244981099, 8.4304955134084, 9.036843123233988, 8.276564501340292, 7.357000846177901, 8.687409424325041, 9.445598032541254, 9.50161488553593, 9.508875141282742], "itemStyle": {"color": "#A5A5A5"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}]
+            };
+            
+            // 替换formatter标记为真正的JavaScript函数
+            option_chart_ebit.series.forEach(function(s) {
+                if (s.label && s.label.formatter) {
+                    if (s.label.formatter === '__FORMATTER_PERCENT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_DECIMAL__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_INT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(0) : '';
+                        };
+                    }
+                }
+            });
+            
+            chart_chart_ebit.setOption(option_chart_ebit);
+        })();
+        
+
+        var chart_chart_operating_expenses;
+        (function() {
+            chart_chart_operating_expenses = echarts.init(document.getElementById('chart_operating_expenses'));
+            var option_chart_operating_expenses = {
+                title: {
+                    text: '营业费用',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: {
+                            color: '#999'
+                        }
+                    },
+                    formatter: function(params) {
+                        var result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            var value = item.value;
+                            var formattedValue;
+                            // 判断是否为百分比系列（通过系列名称判断）
+                            if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {
+                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                            } else {
+                                formattedValue = value != null ? value.toFixed(0) : '-';
+                            }
+                            result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ["销售费用", "管理费用", "研发费用", "税金及附加", "资产减值损失", "信用减值损失", "销售费用率", "管理费用率", "研发费用率", "税金及附加率", "经营资产减值损失率", "营业外收支净额", "营业外收支净额率", "总费用率"],
+                    bottom: 60,
+                    textStyle: {
+                        fontSize: 12
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2012/12/31", "2013/12/31", "2014/12/31", "2015/12/31", "2016/12/31", "2017/12/31", "2018/12/31", "2019/12/31", "2020/12/31", "2021/12/31", "2022/12/31", "2023/12/31", "2024/12/31", "2025Q3-TTM"],
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '亿元',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'right',
+                        axisLabel: {
+                            formatter: function(value) {
+                                return value.toFixed(1) + "%";
+                            }
+                        }
+                    }
+                ],
+                series: [{"name": "销售费用", "type": "bar", "data": [null, 124.3234386, 147.3391742, 147.99769, 176.78451, 267.38673, 310.85879, 346.11231, 275.22276, 286.47344, 287.16121, 348.80875, 387.53649, 404.25916], "itemStyle": {"color": "#ED7D31"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "管理费用", "type": "bar", "data": [null, 67.3345628, 74.9825509, 74.41755, 96.20777, 147.80236, 95.71639, 95.31361, 92.64148, 102.66283, 115.82664, 134.76908, 145.05864, 151.21396], "itemStyle": {"color": "#FFC000"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "研发费用", "type": "bar", "data": [null, 0.0, 0.0, 0.0, 0.0, 0.0, 83.77201, 96.38137, 101.18667, 120.14907, 126.18506, 145.83311, 162.32771, 177.75754], "itemStyle": {"color": "#70AD47"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "税金及附加", "type": "bar", "data": [null, 6.0993261, 8.0959621, 9.1133, 10.77119, 14.16428, 16.17566, 17.20616, 15.33646, 16.09384, 15.65884, 18.16502, 21.19625, 22.10679], "itemStyle": {"color": "#A5A5A5"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "资产减值损失", "type": "bar", "data": [null, 1.2271554, 3.4981816, 0.04766, 3.80812, 2.69112, 4.47864, 8.71909, 7.05209, 4.8342, 5.33363, 4.39777, 10.08107, 12.15929], "itemStyle": {"color": "#4472C4"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "信用减值损失", "type": "bar", "data": [null, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.96446, 2.47605, 3.83451, 5.13686, 1.98624, 0.04595, 2.29968], "itemStyle": {"color": "#C65911"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "销售费用率", "type": "line", "data": [null, 10.276787383598988, 10.400301552101958, 10.69029033302551, 11.115443803392798, 11.108145653096473, 11.971540465127314, 12.440416397737446, 9.68339844287997, 8.395239187857708, 8.349711314948932, 9.37563972083658, 9.518282469146476, 8.95901526774416], "itemStyle": {"color": "#ED7D31"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}, {"name": "管理费用率", "type": "line", "data": [null, 5.565989754269825, 5.292829586836615, 5.3753894089322785, 6.04912761239511, 6.140208015376829, 3.686151631938435, 3.4258850740430233, 3.259484655913253, 3.0085826230605317, 3.367860884067582, 3.622461705988174, 3.5627847847572487, 3.3511378600204256], "itemStyle": {"color": "#FFC000"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}, {"name": "研发费用率", "type": "line", "data": [null, 0.0, 0.0, 0.0, 0.0, 0.0, 3.2261594004147347, 3.46426388528163, 3.560137405490045, 3.5210251283632394, 3.669049950233563, 3.919852064287751, 3.986930356802512, 3.9393851083464457], "itemStyle": {"color": "#70AD47"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}, {"name": "税金及附加率", "type": "line", "data": [null, null, null, null, null, null, null, null, null, null, null, null, null, null], "itemStyle": {"color": "#A5A5A5"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}, {"name": "经营资产减值损失率", "type": "line", "data": [null, null, null, null, null, null, null, null, null, null, null, null, null, null], "itemStyle": {"color": "#5B9BD5"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}, {"name": "营业外收支净额", "type": "bar", "data": [null, null, null, null, null, null, null, null, null, null, null, null, null, null], "itemStyle": {"color": "#5B9BD5"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "营业外收支净额率", "type": "line", "data": [null, null, null, null, null, null, null, null, null, null, null, null, null, null], "itemStyle": {"color": "#4472C4"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}, {"name": "总费用率", "type": "line", "data": [0, 15.842777137868813, 15.693131138938572, 16.065679741957787, 17.164571415787908, 17.248353668473303, 15.657692097065748, 15.866301471780469, 12.942883098793223, 11.40382181091824, 11.717572199016514, 12.998101426824753, 13.081067253903724, 12.310153127764586], "itemStyle": {"color": "#7030A0"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}]
+            };
+            
+            // 替换formatter标记为真正的JavaScript函数
+            option_chart_operating_expenses.series.forEach(function(s) {
+                if (s.label && s.label.formatter) {
+                    if (s.label.formatter === '__FORMATTER_PERCENT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_DECIMAL__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_INT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(0) : '';
+                        };
+                    }
+                }
+            });
+            
+            chart_chart_operating_expenses.setOption(option_chart_operating_expenses);
+        })();
+        
+
+        var chart_chart_roic;
+        (function() {
+            chart_chart_roic = echarts.init(document.getElementById('chart_roic'));
+            var option_chart_roic = {
+                title: {
+                    text: 'ROIC',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: {
+                            color: '#999'
+                        }
+                    },
+                    formatter: function(params) {
+                        var result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            var value = item.value;
+                            var formattedValue;
+                            // 判断是否为百分比系列（通过系列名称判断）
+                            if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {
+                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                            } else {
+                                formattedValue = value != null ? value.toFixed(0) : '-';
+                            }
+                            result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ["息前税后经营利润", "Invested Capital", "ROIC", "息前税后经营利润增速"],
+                    bottom: 60,
+                    textStyle: {
+                        fontSize: 12
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2012/12/31", "2013/12/31", "2014/12/31", "2015/12/31", "2016/12/31", "2017/12/31", "2018/12/31", "2019/12/31", "2020/12/31", "2021/12/31", "2022/12/31", "2023/12/31", "2024/12/31", "2025Q3-TTM"],
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '亿元',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'right',
+                        axisLabel: {
+                            formatter: function(value) {
+                                return value.toFixed(1) + "%";
+                            }
+                        }
+                    }
+                ],
+                series: [{"name": "息前税后经营利润", "type": "bar", "data": [null, 73.69056263408798, 107.87615823180128, 115.02763770093885, 136.323558203658, 167.27957758380688, 178.34138728473835, 210.72468247278573, 201.1731583699657, 212.83293766262895, 254.22114493976474, 290.5423473031572, 315.8119024965927, 354.9924949023999], "itemStyle": {"color": "#ED7D31"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "Invested Capital", "type": "bar", "data": [null, 345.19462169999997, 453.98587309999994, 454.46915, 565.6486299999999, 729.4588900000001, 1033.2731400000002, 809.3850500000001, 473.27225, 771.20593844, 1015.4645207599999, 1387.74929025, 1058.8828388300003, 708.1532654399998], "itemStyle": {"color": "#5B9BD5"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "ROIC", "type": "line", "data": [null, null, 26.99669447232893, 25.323793644383198, 26.727023266599275, 25.83253899781338, 20.23465668627333, 22.8718146009256, 31.36818515280203, 34.204366077226794, 28.457530445048597, 24.17948382054702, 25.816051276604995, 40.179427465524796], "itemStyle": {"color": "#A5A5A5"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}, {"name": "息前税后经营利润增速", "type": "line", "data": [null, null, 46.39073766808185, 6.629342003235479, 18.51374237388631, 22.707754835670244, 6.612767595846844, 18.15803705527113, -4.532703046807802, 5.795892149399191, 19.44633557741053, 14.287246787437146, 8.697374213428787, 12.406306442560352], "itemStyle": {"color": "#FFC000"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}]
+            };
+            
+            // 替换formatter标记为真正的JavaScript函数
+            option_chart_roic.series.forEach(function(s) {
+                if (s.label && s.label.formatter) {
+                    if (s.label.formatter === '__FORMATTER_PERCENT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_DECIMAL__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_INT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(0) : '';
+                        };
+                    }
+                }
+            });
+            
+            chart_chart_roic.setOption(option_chart_roic);
+        })();
+        
+
+        var chart_chart_roe_roic;
+        (function() {
+            chart_chart_roe_roic = echarts.init(document.getElementById('chart_roe_roic'));
+            var option_chart_roe_roic = {
+                title: {
+                    text: 'Equity, Debt, ROE and ROIC',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: {
+                            color: '#999'
+                        }
+                    },
+                    formatter: function(params) {
+                        var result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            var value = item.value;
+                            var formattedValue;
+                            // 判断是否为百分比系列（通过系列名称判断）
+                            if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {
+                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                            } else {
+                                formattedValue = value != null ? value.toFixed(0) : '-';
+                            }
+                            result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ["有息债务合计", "所有者权益合计", "ROIC", "ROE"],
+                    bottom: 60,
+                    textStyle: {
+                        fontSize: 12
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2012/12/31", "2013/12/31", "2014/12/31", "2015/12/31", "2016/12/31", "2017/12/31", "2018/12/31", "2019/12/31", "2020/12/31", "2021/12/31", "2022/12/31", "2023/12/31", "2024/12/31", "2025Q3-TTM"],
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '亿元',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'right',
+                        axisLabel: {
+                            formatter: function(value) {
+                                return value.toFixed(1) + "%";
+                            }
+                        }
+                    }
+                ],
+                series: [{"name": "有息债务合计", "type": "bar", "data": [null, 115.7665242, 78.1220253, 47.57998, 107.73263, 408.04781, 411.68722, 485.83555, 593.43417, 560.11395, 696.59996, 763.74212, 898.98052, 563.62097], "itemStyle": {"color": "#5B9BD5"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "所有者权益合计", "type": "bar", "data": [null, 395.0882515, 458.2525427, 561.50473, 690.82337, 830.20488, 925.65712, 1074.96097, 1242.371, 1348.25075844, 1519.23802076, 1742.99649025, 2276.67390883, 2341.07699544], "itemStyle": {"color": "#ED7D31"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "ROIC", "type": "line", "data": [null, 42.695081557864256, 26.99669447232893, 25.323793644383198, 26.727023266599275, 25.83253899781338, 20.23465668627333, 22.8718146009256, 31.36818515280203, 34.204366077226794, 28.457530445048597, 24.17948382054702, 25.816051276604995, 40.179427465524796], "itemStyle": {"color": "#A5A5A5"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}, {"name": "ROE", "type": "line", "data": [null, 40.72487824913214, 25.34337224587358, 25.12961729819296, 26.66220298019345, 22.81037055031687, 21.040928045598115, 24.58734740322177, 21.53544966628152, 20.651825310159072, 20.902693825613557, 19.531767500146064, 17.965954128111765, 18.859909034822167], "itemStyle": {"color": "#FFC000"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}]
+            };
+            
+            // 替换formatter标记为真正的JavaScript函数
+            option_chart_roe_roic.series.forEach(function(s) {
+                if (s.label && s.label.formatter) {
+                    if (s.label.formatter === '__FORMATTER_PERCENT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_DECIMAL__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_INT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(0) : '';
+                        };
+                    }
+                }
+            });
+            
+            chart_chart_roe_roic.setOption(option_chart_roe_roic);
+        })();
+        
+
+        var chart_chart_asset_efficiency;
+        (function() {
+            chart_chart_asset_efficiency = echarts.init(document.getElementById('chart_asset_efficiency'));
+            var option_chart_asset_efficiency = {
+                title: {
+                    text: '经营资产效率',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: {
+                            color: '#999'
+                        }
+                    },
+                    formatter: function(params) {
+                        var result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            var value = item.value;
+                            var formattedValue;
+                            // 判断是否为百分比系列（通过系列名称判断）
+                            if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {
+                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                            } else {
+                                formattedValue = value != null ? value.toFixed(0) : '-';
+                            }
+                            result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ["净利润", "经营资产周转率", "长期经营资产周转率", "固定资产周转率"],
+                    bottom: 60,
+                    textStyle: {
+                        fontSize: 12
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2012/12/31", "2013/12/31", "2014/12/31", "2015/12/31", "2016/12/31", "2017/12/31", "2018/12/31", "2019/12/31", "2020/12/31", "2021/12/31", "2022/12/31", "2023/12/31", "2024/12/31", "2025Q3-TTM"],
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '亿元',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '次',
+                        position: 'right',
+                        axisLabel: {
+                            formatter: function(value) {
+                                return value.toFixed(0);
+                            }
+                        }
+                    }
+                ],
+                series: [{"name": "净利润", "type": "bar", "data": [null, 80.4496047, 108.132667, 128.13055, 166.94913, 173.47609, 184.72483, 245.94946, 249.52393, 267.50534, 299.6912, 318.58603, 361.08607, 435.45181], "itemStyle": {"color": "#FFC000"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "经营资产周转率", "type": "line", "data": [null, 4.9, 4.0, 4.5, 4.7, 4.1, 2.9, 4.1, 10.2, 6.5, 4.2, 3.1, 4.5, 8.4], "itemStyle": {"color": "#5B9BD5"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_DECIMAL__"}}, {"name": "长期经营资产周转率", "type": "line", "data": [null, 4.1, 4.6, 4.8, 4.0, 3.5, 3.6, 3.8, 3.4, 3.0, 2.7, 2.1, 2.0, 2.2], "itemStyle": {"color": "#ED7D31"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_DECIMAL__"}}, {"name": "固定资产周转率", "type": "line", "data": [null, 6.2, 7.3, 7.4, 7.6, 10.7, 11.6, 12.8, 12.8, 14.9, 13.2, 12.0, 12.1, 10.5], "itemStyle": {"color": "#A5A5A5"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_DECIMAL__"}}]
+            };
+            
+            // 替换formatter标记为真正的JavaScript函数
+            option_chart_asset_efficiency.series.forEach(function(s) {
+                if (s.label && s.label.formatter) {
+                    if (s.label.formatter === '__FORMATTER_PERCENT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_DECIMAL__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_INT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(0) : '';
+                        };
+                    }
+                }
+            });
+            
+            chart_chart_asset_efficiency.setOption(option_chart_asset_efficiency);
+        })();
+        
+
+        var chart_chart_turnover_days;
+        (function() {
+            chart_chart_turnover_days = echarts.init(document.getElementById('chart_turnover_days'));
+            var option_chart_turnover_days = {
+                title: {
+                    text: '周转天数及营业周期',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: {
+                            color: '#999'
+                        }
+                    },
+                    formatter: function(params) {
+                        var result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            var value = item.value;
+                            var formattedValue;
+                            // 判断是否为百分比系列（通过系列名称判断）
+                            if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {
+                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                            } else {
+                                formattedValue = value != null ? value.toFixed(0) : '-';
+                            }
+                            result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ["应收账款周转天数", "存货周转天数", "应付账款周转天数", "营业周期", "现金周期"],
+                    bottom: 60,
+                    textStyle: {
+                        fontSize: 12
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2012/12/31", "2013/12/31", "2014/12/31", "2015/12/31", "2016/12/31", "2017/12/31", "2018/12/31", "2019/12/31", "2020/12/31", "2021/12/31", "2022/12/31", "2023/12/31", "2024/12/31", "2025Q3-TTM"],
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '天',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'right',
+                        axisLabel: {
+                            formatter: function(value) {
+                                return value.toFixed(0);
+                            }
+                        }
+                    }
+                ],
+                series: [{"name": "应收账款周转天数", "type": "line", "data": [null, 25.8, 51.0, 52.9, 32.4, 16.4, 18.4, 14.7, 11.0, 8.2, 5.6, 0.8, -4.5, 12.0], "itemStyle": {"color": "#5B9BD5"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_DECIMAL__"}}, {"name": "存货周转天数", "type": "line", "data": [null, 29.9, 52.2, 45.3, 41.2, 45.6, 57.3, 57.3, 54.5, 53.1, 64.4, 62.3, 67.4, 60.7], "itemStyle": {"color": "#ED7D31"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_DECIMAL__"}}, {"name": "应付账款周转天数", "type": "line", "data": [null, 32.3, 68.0, 85.6, 87.0, 76.5, 82.0, 80.2, 92.2, 93.0, 95.4, 86.5, 92.3, 98.3], "itemStyle": {"color": "#A5A5A5"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_DECIMAL__"}}, {"name": "营业周期", "type": "line", "data": [null, 55.7, 103.2, 98.2, 73.6, 62.0, 75.7, 72.0, 65.5, 61.3, 70.0, 63.1, 62.9, 72.7], "itemStyle": {"color": "#FFC000"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_DECIMAL__"}}, {"name": "现金周期", "type": "line", "data": [null, 23.4, 35.2, 12.6, -13.4, -14.5, -6.3, -8.2, -26.7, -31.7, -25.4, -23.4, -29.4, -25.6], "itemStyle": {"color": "#4169E1"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_DECIMAL__"}}]
+            };
+            
+            // 替换formatter标记为真正的JavaScript函数
+            option_chart_turnover_days.series.forEach(function(s) {
+                if (s.label && s.label.formatter) {
+                    if (s.label.formatter === '__FORMATTER_PERCENT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_DECIMAL__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_INT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(0) : '';
+                        };
+                    }
+                }
+            });
+            
+            chart_chart_turnover_days.setOption(option_chart_turnover_days);
+        })();
+        
+
+        var chart_chart_turnover_ratio;
+        (function() {
+            chart_chart_turnover_ratio = echarts.init(document.getElementById('chart_turnover_ratio'));
+            var option_chart_turnover_ratio = {
+                title: {
+                    text: '经营周转率',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: {
+                            color: '#999'
+                        }
+                    },
+                    formatter: function(params) {
+                        var result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            var value = item.value;
+                            var formattedValue;
+                            // 判断是否为百分比系列（通过系列名称判断）
+                            if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {
+                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                            } else {
+                                formattedValue = value != null ? value.toFixed(0) : '-';
+                            }
+                            result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ["应收账款周转率", "存货周转率", "应付账款周转率", "经营资产周转率"],
+                    bottom: 60,
+                    textStyle: {
+                        fontSize: 12
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2012/12/31", "2013/12/31", "2014/12/31", "2015/12/31", "2016/12/31", "2017/12/31", "2018/12/31", "2019/12/31", "2020/12/31", "2021/12/31", "2022/12/31", "2023/12/31", "2024/12/31", "2025Q3-TTM"],
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '次',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'right',
+                        axisLabel: {
+                            formatter: function(value) {
+                                return value.toFixed(0);
+                            }
+                        }
+                    }
+                ],
+                series: [{"name": "应收账款周转率", "type": "line", "data": [null, 14.2, 7.2, 6.9, 11.3, 22.3, 19.9, 24.9, 33.3, 44.4, 65.3, 443.6, -80.7, 30.5], "itemStyle": {"color": "#5B9BD5"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_DECIMAL__"}}, {"name": "存货周转率", "type": "line", "data": [null, 12.2, 7.0, 8.1, 8.9, 8.0, 6.4, 6.4, 6.7, 6.9, 5.7, 5.9, 5.4, 6.0], "itemStyle": {"color": "#ED7D31"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_DECIMAL__"}}, {"name": "应付账款周转率", "type": "line", "data": [null, 11.3, 5.4, 4.3, 4.2, 4.8, 4.5, 4.6, 4.0, 3.9, 3.8, 4.2, 4.0, 3.7], "itemStyle": {"color": "#A5A5A5"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_DECIMAL__"}}, {"name": "经营资产周转率", "type": "line", "data": [null, 4.9, 4.0, 4.5, 4.7, 4.1, 2.9, 4.1, 10.2, 6.5, 4.2, 3.1, 4.5, 8.4], "itemStyle": {"color": "#FFC000"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_DECIMAL__"}}]
+            };
+            
+            // 替换formatter标记为真正的JavaScript函数
+            option_chart_turnover_ratio.series.forEach(function(s) {
+                if (s.label && s.label.formatter) {
+                    if (s.label.formatter === '__FORMATTER_PERCENT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_DECIMAL__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_INT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(0) : '';
+                        };
+                    }
+                }
+            });
+            
+            chart_chart_turnover_ratio.setOption(option_chart_turnover_ratio);
+        })();
+        
+
+        var chart_chart_finance_cost_burden;
+        (function() {
+            chart_chart_finance_cost_burden = echarts.init(document.getElementById('chart_finance_cost_burden'));
+            var option_chart_finance_cost_burden = {
+                title: {
+                    text: '财务成本负担率',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: {
+                            color: '#999'
+                        }
+                    },
+                    formatter: function(params) {
+                        var result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            var value = item.value;
+                            var formattedValue;
+                            // 判断是否为百分比系列（通过系列名称判断）
+                            if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {
+                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                            } else {
+                                formattedValue = value != null ? value.toFixed(0) : '-';
+                            }
+                            result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ["真实财务费用", "税前利润", "财务成本负担率"],
+                    bottom: 60,
+                    textStyle: {
+                        fontSize: 12
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2012/12/31", "2013/12/31", "2014/12/31", "2015/12/31", "2016/12/31", "2017/12/31", "2018/12/31", "2019/12/31", "2020/12/31", "2021/12/31", "2022/12/31", "2023/12/31", "2024/12/31", "2025Q3-TTM"],
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '亿元',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'right',
+                        axisLabel: {
+                            formatter: function(value) {
+                                return value.toFixed(1) + "%";
+                            }
+                        }
+                    }
+                ],
+                series: [{"name": "真实财务费用", "type": "bar", "data": [null, 5.6422053, 2.5132694, 1.38932, -10.05979, 8.15949, 3.32822, 15.755, 10.24996, 7.95547, 24.50222, 36.8979, 38.71743, 12.92292], "itemStyle": {"color": "#5B9BD5"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "税前利润", "type": "bar", "data": [null, 97.5923604, 131.5762263, 152.39754, 197.47604, 205.91193, 225.95122, 292.46916, 291.0939, 314.52702, 351.1482, 383.90414, 440.41139, 524.51159], "itemStyle": {"color": "#ED7D31"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "财务成本负担率", "type": "line", "data": [null, 5.47, 1.87, 0.9, -5.37, 3.81, 1.45, 5.11, 3.4, 2.47, 6.52, 8.77, 8.08, 2.4], "itemStyle": {"color": "#A5A5A5"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}]
+            };
+            
+            // 替换formatter标记为真正的JavaScript函数
+            option_chart_finance_cost_burden.series.forEach(function(s) {
+                if (s.label && s.label.formatter) {
+                    if (s.label.formatter === '__FORMATTER_PERCENT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_DECIMAL__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_INT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(0) : '';
+                        };
+                    }
+                }
+            });
+            
+            chart_chart_finance_cost_burden.setOption(option_chart_finance_cost_burden);
+        })();
+        
+
+        var chart_chart_capex_analysis;
+        (function() {
+            chart_chart_capex_analysis = echarts.init(document.getElementById('chart_capex_analysis'));
+            var option_chart_capex_analysis = {
+                title: {
+                    text: '长期经营资产投资和并购活动分析',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: {
+                            color: '#999'
+                        }
+                    },
+                    formatter: function(params) {
+                        var result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            var value = item.value;
+                            var formattedValue;
+                            // 判断是否为百分比系列（通过系列名称判断）
+                            if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {
+                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                            } else {
+                                formattedValue = value != null ? value.toFixed(0) : '-';
+                            }
+                            result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ["资本支出净额", "扩张性资本支出", "长期经营资产合计", "扩张性资本支出占长期资产期初净额的比例"],
+                    bottom: 60,
+                    textStyle: {
+                        fontSize: 12
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2012/12/31", "2013/12/31", "2014/12/31", "2015/12/31", "2016/12/31", "2017/12/31", "2018/12/31", "2019/12/31", "2020/12/31", "2021/12/31", "2022/12/31", "2023/12/31", "2024/12/31", "2025Q3-TTM"],
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '亿元',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'right',
+                        axisLabel: {
+                            formatter: function(value) {
+                                return value.toFixed(1) + "%";
+                            }
+                        }
+                    }
+                ],
+                series: [{"name": "资本支出净额", "type": "bar", "data": [null, 14.495517, 14.0705638, 28.666539999999998, 47.59628, 276.27471, 57.38028, 35.29494, 53.860299999999995, 83.29593, 80.60208, 58.9627, 68.01159, 138.75704000000002], "itemStyle": {"color": "#A5A5A5"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "扩张性资本支出", "type": "bar", "data": [null, -17.6234831, -21.3014567, -2.19446, 10.69754, 263.0022, 8.85638, -17.69899, 19.15986, 82.71336, 14.92434, -15.13519, -12.37576, 58.36969], "itemStyle": {"color": "#ED7D31"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "长期经营资产合计", "type": "bar", "data": [null, 295.3279376, 310.6009229, 291.04734, 402.19964, 690.7556, 715.42862, 739.78297, 832.37649, 1138.99616, 1277.40816, 1779.96536, 1986.39412, 2079.65665], "itemStyle": {"color": "#595959"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%"}, {"name": "扩张性资本支出占长期资产期初净额的比例", "type": "line", "data": [null, null, -7.21, -0.71, 3.68, 65.39, 1.28, -2.47, 2.59, 9.94, 1.31, -1.18, -0.7, 2.54], "itemStyle": {"color": "#FFC000"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}]
+            };
+            
+            // 替换formatter标记为真正的JavaScript函数
+            option_chart_capex_analysis.series.forEach(function(s) {
+                if (s.label && s.label.formatter) {
+                    if (s.label.formatter === '__FORMATTER_PERCENT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_DECIMAL__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_INT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(0) : '';
+                        };
+                    }
+                }
+            });
+            
+            chart_chart_capex_analysis.setOption(option_chart_capex_analysis);
+        })();
+        
+
+        var chart_chart_investment_income;
+        (function() {
+            chart_chart_investment_income = echarts.init(document.getElementById('chart_investment_income'));
+            var option_chart_investment_income = {
+                title: {
+                    text: '投资收益',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: {
+                            color: '#999'
+                        }
+                    },
+                    formatter: function(params) {
+                        var result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            var value = item.value;
+                            var formattedValue;
+                            // 判断是否为百分比系列（通过系列名称判断）
+                            if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {
+                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                            } else {
+                                formattedValue = value != null ? value.toFixed(0) : '-';
+                            }
+                            result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ["长期股权投资收益", "长期股权外投资收益", "长期股权投资收益率"],
+                    bottom: 60,
+                    textStyle: {
+                        fontSize: 12
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2012/12/31", "2013/12/31", "2014/12/31", "2015/12/31", "2016/12/31", "2017/12/31", "2018/12/31", "2019/12/31", "2020/12/31", "2021/12/31", "2022/12/31", "2023/12/31", "2024/12/31", "2025Q3-TTM"],
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '亿元',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'right',
+                        axisLabel: {
+                            formatter: function(value) {
+                                return value.toFixed(1) + "%";
+                            }
+                        }
+                    }
+                ],
+                series: [{"name": "长期股权投资收益", "type": "bar", "data": [null, 0.3726541, 0.9473907, 4.20744, 1.65904, 3.10016, 3.49321, 5.06225, 4.02528, 5.60679, 6.08278, 6.80759, 8.47098, 7.85227], "itemStyle": {"color": "#5B9BD5"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%", "label": {"show": true, "position": "inside", "formatter": "__FORMATTER_DECIMAL__"}}, {"name": "长期股权外投资收益", "type": "bar", "data": [null, 9.6071354, 14.1638313, 15.90525, 11.200569999999999, 15.20205, 5.58005, -3.42093, 19.599339999999998, 18.05094, -4.00224, -2.1719800000000005, 5.9584199999999985, 12.06467], "itemStyle": {"color": "#A5A5A5"}, "stack": "total", "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "20%", "label": {"show": true, "position": "inside", "formatter": "__FORMATTER_DECIMAL__"}}, {"name": "长期股权投资收益率", "type": "line", "data": [null, 2.12, 9.95, 14.57, 7.5, 11.77, 12.87, 18.14, 13.87, 14.77, 11.72, 13.68, 16.22, 15.32], "itemStyle": {"color": "#ED7D31"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_PERCENT__"}}]
+            };
+            
+            // 替换formatter标记为真正的JavaScript函数
+            option_chart_investment_income.series.forEach(function(s) {
+                if (s.label && s.label.formatter) {
+                    if (s.label.formatter === '__FORMATTER_PERCENT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_DECIMAL__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_INT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(0) : '';
+                        };
+                    }
+                }
+            });
+            
+            chart_chart_investment_income.setOption(option_chart_investment_income);
+        })();
+        
+
+        var chart_chart_fcff_ebit;
+        (function() {
+            chart_chart_fcff_ebit = echarts.init(document.getElementById('chart_fcff_ebit'));
+            var option_chart_fcff_ebit = {
+                title: {
+                    text: '根据息税前经营利润计算的FCFF',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: {
+                            color: '#999'
+                        }
+                    },
+                    formatter: function(params) {
+                        var result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            var value = item.value;
+                            var formattedValue;
+                            // 判断是否为百分比系列（通过系列名称判断）
+                            if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {
+                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                            } else {
+                                formattedValue = value != null ? value.toFixed(0) : '-';
+                            }
+                            result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ["息税前经营利润", "折旧及摊销合计", "资本支出总额", "营运资本变化量", "FCFF"],
+                    bottom: 60,
+                    textStyle: {
+                        fontSize: 12
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2012/12/31", "2013/12/31", "2014/12/31", "2015/12/31", "2016/12/31", "2017/12/31", "2018/12/31", "2019/12/31", "2020/12/31", "2021/12/31", "2022/12/31", "2023/12/31", "2024/12/31", "2025Q3-TTM"],
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'right',
+                        axisLabel: {
+                            formatter: function(value) {
+                                return value.toFixed(0);
+                            }
+                        }
+                    }
+                ],
+                series: [{"name": "息税前经营利润", "type": "bar", "data": [null, 74.0, 108.0, 115.0, 136.0, 167.0, 178.0, 211.0, 201.0, 213.0, 254.0, 291.0, 316.0, 355.0], "itemStyle": {"color": "#70AD47"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "40%"}, {"name": "折旧及摊销合计", "type": "bar", "data": [null, 32.0, 35.0, 31.0, 37.0, -13.0, 48.0, 53.0, 35.0, -1.0, 66.0, 74.0, 76.0, 76.0], "itemStyle": {"color": "#FFC000"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "40%"}, {"name": "资本支出总额", "type": "bar", "data": [null, 14.0, 14.0, 29.0, 48.0, 276.0, 57.0, 35.0, 54.0, 83.0, 81.0, 59.0, 68.0, 139.0], "itemStyle": {"color": "#5B9BD5"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "40%"}, {"name": "营运资本变化量", "type": "bar", "data": [null, -89.0, 23.0, 78.0, 48.0, -287.0, 244.0, 486.0, 60.0, -157.0, 130.0, 505.0, 449.0, null], "itemStyle": {"color": "#ED7D31"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "40%"}, {"name": "FCFF", "type": "bar", "data": [0.0, 180.0, 106.0, 39.0, 77.0, 165.0, -76.0, -257.0, 122.0, 286.0, 110.0, -200.0, -125.0, 293.0], "itemStyle": {"color": "#A5A5A5"}, "barMaxWidth": 50, "barGap": "5%", "barCategoryGap": "40%"}]
+            };
+            
+            // 替换formatter标记为真正的JavaScript函数
+            option_chart_fcff_ebit.series.forEach(function(s) {
+                if (s.label && s.label.formatter) {
+                    if (s.label.formatter === '__FORMATTER_PERCENT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_DECIMAL__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_INT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(0) : '';
+                        };
+                    }
+                }
+            });
+            
+            chart_chart_fcff_ebit.setOption(option_chart_fcff_ebit);
+        })();
+        
+
+        var chart_chart_fcfe_dividend;
+        (function() {
+            chart_chart_fcfe_dividend = echarts.init(document.getElementById('chart_fcfe_dividend'));
+            var option_chart_fcfe_dividend = {
+                title: {
+                    text: '股权自由现金流VS分红',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: {
+                            color: '#999'
+                        }
+                    },
+                    formatter: function(params) {
+                        var result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            var value = item.value;
+                            var formattedValue;
+                            // 判断是否为百分比系列（通过系列名称判断）
+                            if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {
+                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                            } else {
+                                formattedValue = value != null ? value.toFixed(0) : '-';
+                            }
+                            result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ["FCFE", "分红"],
+                    bottom: 60,
+                    textStyle: {
+                        fontSize: 12
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '22%',
+                    top: '15%',
+                    containLabel: true
+                },
+                dataZoom: [
+                    {
+                        type: 'slider',
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100,
+                        bottom: 0
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: [0],
+                        start: 28.57,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'category',
+                    data: ["2012/12/31", "2013/12/31", "2014/12/31", "2015/12/31", "2016/12/31", "2017/12/31", "2018/12/31", "2019/12/31", "2020/12/31", "2021/12/31", "2022/12/31", "2023/12/31", "2024/12/31", "2025Q3-TTM"],
+                    axisPointer: {
+                        type: 'shadow'
+                    },
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 11
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '',
+                        position: 'right',
+                        axisLabel: {
+                            formatter: function(value) {
+                                return value.toFixed(0);
+                            }
+                        }
+                    }
+                ],
+                series: [{"name": "FCFE", "type": "line", "data": [null, 225.0, 137.0, -8.0, -192.0, 167.0, -143.0, -330.0, 204.0, 204.0, 88.0, -307.0, 255.0, 373.0], "itemStyle": {"color": "#5470C6"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_INT__"}}, {"name": "分红", "type": "line", "data": [null, 34.0, 42.0, 51.0, 65.0, 79.0, 87.0, 112.0, 113.0, 119.0, 175.0, 211.0, 268.0, 38.0], "itemStyle": {"color": "#EE6666"}, "yAxisIndex": 1, "lineStyle": {"width": 3}, "symbolSize": 8, "label": {"show": true, "position": "top", "formatter": "__FORMATTER_INT__"}}]
+            };
+            
+            // 替换formatter标记为真正的JavaScript函数
+            option_chart_fcfe_dividend.series.forEach(function(s) {
+                if (s.label && s.label.formatter) {
+                    if (s.label.formatter === '__FORMATTER_PERCENT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_DECIMAL__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(1) : '';
+                        };
+                    } else if (s.label.formatter === '__FORMATTER_INT__') {
+                        s.label.formatter = function(params) {
+                            return params.value != null ? params.value.toFixed(0) : '';
+                        };
+                    }
+                }
+            });
+            
+            chart_chart_fcfe_dividend.setOption(option_chart_fcfe_dividend);
+        })();
+        
+
+        
+        // 时间轴同步缩放 - 使用ECharts的connect功能
+        var allCharts = [chart_chart_assets_composition, chart_chart_capital_structure, chart_chart_long_term_assets, chart_chart_working_capital_ratio, chart_chart_revenue_profit, chart_chart_ebit, chart_chart_operating_expenses, chart_chart_roic, chart_chart_roe_roic, chart_chart_asset_efficiency, chart_chart_turnover_days, chart_chart_turnover_ratio, chart_chart_finance_cost_burden, chart_chart_capex_analysis, chart_chart_investment_income, chart_chart_fcff_ebit, chart_chart_fcfe_dividend];
+        
+        // 使用ECharts的group功能实现图表联动
+        echarts.connect('financialReportGroup');
+        allCharts.forEach(function(chart) {
+            chart.group = 'financialReportGroup';
+        });
+        
+        // 响应式调整
+        window.addEventListener('resize', function() {
+            echarts.init(document.getElementById('chart_assets_composition')).resize();
+            echarts.init(document.getElementById('chart_capital_structure')).resize();
+            echarts.init(document.getElementById('chart_long_term_assets')).resize();
+            echarts.init(document.getElementById('chart_working_capital_ratio')).resize();
+            echarts.init(document.getElementById('chart_revenue_profit')).resize();
+            echarts.init(document.getElementById('chart_ebit')).resize();
+            echarts.init(document.getElementById('chart_operating_expenses')).resize();
+            echarts.init(document.getElementById('chart_roic')).resize();
+            echarts.init(document.getElementById('chart_roe_roic')).resize();
+            echarts.init(document.getElementById('chart_asset_efficiency')).resize();
+            echarts.init(document.getElementById('chart_turnover_days')).resize();
+            echarts.init(document.getElementById('chart_turnover_ratio')).resize();
+            echarts.init(document.getElementById('chart_finance_cost_burden')).resize();
+            echarts.init(document.getElementById('chart_capex_analysis')).resize();
+            echarts.init(document.getElementById('chart_investment_income')).resize();
+            echarts.init(document.getElementById('chart_fcff_ebit')).resize();
+            echarts.init(document.getElementById('chart_fcfe_dividend')).resize();
+        });
+    </script>
+</body>
+</html>

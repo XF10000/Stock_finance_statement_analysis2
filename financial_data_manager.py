@@ -6,6 +6,7 @@
 import sqlite3
 import threading
 import json
+import time
 import pandas as pd
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Any
@@ -174,9 +175,10 @@ class FinancialDataManager:
                     
                     -- 元数据
                     data_complete INTEGER DEFAULT 1,
+                    is_ttm INTEGER DEFAULT 0,
                     update_time TEXT,
                     
-                    UNIQUE(ts_code, end_date)
+                    UNIQUE(ts_code, end_date, is_ttm)
                 )
             ''')
             
@@ -241,6 +243,13 @@ class FinancialDataManager:
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_fina_indicator_end_date ON fina_indicator(end_date)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_core_indicators_ts_code ON core_indicators(ts_code)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_core_indicators_end_date ON core_indicators(end_date)')
+            
+            # 迁移：为旧数据库补充 is_ttm 列（新数据库已在建表时包含）
+            try:
+                cursor.execute('ALTER TABLE core_indicators ADD COLUMN is_ttm INTEGER DEFAULT 0')
+                self.logger.info("迁移：为 core_indicators 表添加 is_ttm 列")
+            except sqlite3.OperationalError:
+                pass  # 列已存在，忽略
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_market_distribution_end_date ON market_distribution(end_date)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_dividend_ts_code ON dividend(ts_code)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_dividend_end_date ON dividend(end_date)')
@@ -362,34 +371,34 @@ class FinancialDataManager:
         if 'ann_date' in data.columns and len(data) > 0:
             ann_date = str(data['ann_date'].iloc[0]) if pd.notna(data['ann_date'].iloc[0]) else None
         
-        try:
-            # 使用 BEGIN IMMEDIATE 立即获取写锁
-            cursor.execute('BEGIN IMMEDIATE')
-            
-            cursor.execute(f'''
-                INSERT OR REPLACE INTO {data_type}
-                (ts_code, end_date, ann_date, data_json, update_flag, update_time)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (ts_code, end_date, ann_date, data_json, update_flag,
-                  datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-            
-            conn.commit()
-            
-        except sqlite3.OperationalError as e:
-            if 'locked' in str(e).lower():
-                # 数据库锁定，等待后重试
-                conn.rollback()
-                import time
-                time.sleep(0.1)
-                return self.save_financial_data(ts_code, end_date, data_type, data, update_flag)
-            else:
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                # 使用 BEGIN IMMEDIATE 立即获取写锁
+                cursor.execute('BEGIN IMMEDIATE')
+                
+                cursor.execute(f'''
+                    INSERT OR REPLACE INTO {data_type}
+                    (ts_code, end_date, ann_date, data_json, update_flag, update_time)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (ts_code, end_date, ann_date, data_json, update_flag,
+                      datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+                
+                conn.commit()
+                return
+                
+            except sqlite3.OperationalError as e:
+                if 'locked' in str(e).lower() and attempt < max_retries - 1:
+                    conn.rollback()
+                    time.sleep(0.1 * (attempt + 1))
+                    continue
                 conn.rollback()
                 self.logger.error(f"保存 {data_type} 数据失败 ({ts_code}, {end_date}): {e}")
                 raise
-        except Exception as e:
-            conn.rollback()
-            self.logger.error(f"保存 {data_type} 数据失败 ({ts_code}, {end_date}): {e}")
-            raise
+            except Exception as e:
+                conn.rollback()
+                self.logger.error(f"保存 {data_type} 数据失败 ({ts_code}, {end_date}): {e}")
+                raise
     
     def save_financial_data_batch(self, batch_data: List[Dict[str, Any]]):
         """
@@ -486,16 +495,15 @@ class FinancialDataManager:
         
         cursor.execute(query, params)
         
-        all_data = []
+        all_records = []
         for row in cursor.fetchall():
-            data_json = row[0]
-            data = pd.read_json(StringIO(data_json), orient='records')
-            all_data.append(data)
+            records = json.loads(row[0])
+            if isinstance(records, list):
+                all_records.extend(records)
+            else:
+                all_records.append(records)
         
-        if all_data:
-            return pd.concat(all_data, ignore_index=True)
-        else:
-            return pd.DataFrame()
+        return pd.DataFrame(all_records) if all_records else pd.DataFrame()
     
     def get_financial_data_batch_optimized(self, ts_codes: List[str], 
                                           data_type: str,
@@ -581,7 +589,8 @@ class FinancialDataManager:
     
     def save_core_indicators(self, ts_code: str, end_date: str, 
                             indicators: Dict[str, float],
-                            data_complete: int = 1):
+                            data_complete: int = 1,
+                            is_ttm: int = 0):
         """
         保存四大核心指标
         
@@ -590,52 +599,55 @@ class FinancialDataManager:
             end_date: 报告期
             indicators: 指标字典
             data_complete: 数据完整性标识
+            is_ttm: 是否为TTM数据（0=年报，1=TTM）
         """
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        try:
-            cursor.execute('BEGIN IMMEDIATE')
-            
-            cursor.execute('''
-                INSERT OR REPLACE INTO core_indicators
-                (ts_code, end_date, ar_turnover_log, gross_margin, lta_turnover_log,
-                 working_capital_ratio, ocf_ratio, ar_turnover_log_percentile,
-                 gross_margin_percentile, lta_turnover_log_percentile,
-                 working_capital_ratio_percentile, ocf_ratio_percentile,
-                 data_complete, update_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                ts_code, end_date,
-                indicators.get('ar_turnover_log'),
-                indicators.get('gross_margin'),
-                indicators.get('lta_turnover_log'),
-                indicators.get('working_capital_ratio'),
-                indicators.get('ocf_ratio'),
-                indicators.get('ar_turnover_log_percentile'),
-                indicators.get('gross_margin_percentile'),
-                indicators.get('lta_turnover_log_percentile'),
-                indicators.get('working_capital_ratio_percentile'),
-                indicators.get('ocf_ratio_percentile'),
-                data_complete,
-                datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            ))
-            
-            conn.commit()
-            
-        except sqlite3.OperationalError as e:
-            if 'locked' in str(e).lower():
-                conn.rollback()
-                import time
-                time.sleep(0.1)
-                return self.save_core_indicators(ts_code, end_date, indicators, data_complete)
-            else:
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                cursor.execute('BEGIN IMMEDIATE')
+                
+                cursor.execute('''
+                    INSERT OR REPLACE INTO core_indicators
+                    (ts_code, end_date, ar_turnover_log, gross_margin, lta_turnover_log,
+                     working_capital_ratio, ocf_ratio, ar_turnover_log_percentile,
+                     gross_margin_percentile, lta_turnover_log_percentile,
+                     working_capital_ratio_percentile, ocf_ratio_percentile,
+                     data_complete, is_ttm, update_time)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    ts_code, end_date,
+                    indicators.get('ar_turnover_log'),
+                    indicators.get('gross_margin'),
+                    indicators.get('lta_turnover_log'),
+                    indicators.get('working_capital_ratio'),
+                    indicators.get('ocf_ratio'),
+                    indicators.get('ar_turnover_log_percentile'),
+                    indicators.get('gross_margin_percentile'),
+                    indicators.get('lta_turnover_log_percentile'),
+                    indicators.get('working_capital_ratio_percentile'),
+                    indicators.get('ocf_ratio_percentile'),
+                    data_complete,
+                    is_ttm,
+                    datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                ))
+                
+                conn.commit()
+                return
+                
+            except sqlite3.OperationalError as e:
+                if 'locked' in str(e).lower() and attempt < max_retries - 1:
+                    conn.rollback()
+                    time.sleep(0.1 * (attempt + 1))
+                    continue
                 conn.rollback()
                 raise
-        except Exception as e:
-            conn.rollback()
-            self.logger.error(f"保存核心指标失败 ({ts_code}, {end_date}): {e}")
-            raise
+            except Exception as e:
+                conn.rollback()
+                self.logger.error(f"保存核心指标失败 ({ts_code}, {end_date}): {e}")
+                raise
     
     def get_core_indicators(self, ts_code: str, 
                            start_date: str = None, 
@@ -688,43 +700,44 @@ class FinancialDataManager:
         # 将分位数数据转换为JSON
         percentiles_json = json.dumps(distribution.get('percentiles', {}))
         
-        try:
-            cursor.execute('BEGIN IMMEDIATE')
-            
-            cursor.execute('''
-                INSERT OR REPLACE INTO market_distribution
-                (end_date, indicator_name, count, mean, median, std, min, max,
-                 p25, p75, percentiles_json, update_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                end_date, indicator_name,
-                distribution.get('count'),
-                distribution.get('mean'),
-                distribution.get('median'),
-                distribution.get('std'),
-                distribution.get('min'),
-                distribution.get('max'),
-                distribution.get('p25'),
-                distribution.get('p75'),
-                percentiles_json,
-                datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            ))
-            
-            conn.commit()
-            
-        except sqlite3.OperationalError as e:
-            if 'locked' in str(e).lower():
-                conn.rollback()
-                import time
-                time.sleep(0.1)
-                return self.save_market_distribution(end_date, indicator_name, distribution)
-            else:
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                cursor.execute('BEGIN IMMEDIATE')
+                
+                cursor.execute('''
+                    INSERT OR REPLACE INTO market_distribution
+                    (end_date, indicator_name, count, mean, median, std, min, max,
+                     p25, p75, percentiles_json, update_time)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    end_date, indicator_name,
+                    distribution.get('count'),
+                    distribution.get('mean'),
+                    distribution.get('median'),
+                    distribution.get('std'),
+                    distribution.get('min'),
+                    distribution.get('max'),
+                    distribution.get('p25'),
+                    distribution.get('p75'),
+                    percentiles_json,
+                    datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                ))
+                
+                conn.commit()
+                return
+                
+            except sqlite3.OperationalError as e:
+                if 'locked' in str(e).lower() and attempt < max_retries - 1:
+                    conn.rollback()
+                    time.sleep(0.1 * (attempt + 1))
+                    continue
                 conn.rollback()
                 raise
-        except Exception as e:
-            conn.rollback()
-            self.logger.error(f"保存市场分布数据失败 ({end_date}, {indicator_name}): {e}")
-            raise
+            except Exception as e:
+                conn.rollback()
+                self.logger.error(f"保存市场分布数据失败 ({end_date}, {indicator_name}): {e}")
+                raise
     
     def get_market_distribution(self, end_date: str, indicator_name: str) -> Dict:
         """
@@ -1064,3 +1077,31 @@ if __name__ == '__main__':
         print(f"  {table}: {count} 条记录")
     
     print("\n✓ 所有测试通过！")
+
+
+def normalize_stock_code(ts_code: str) -> str:
+    """
+    规范化股票代码，自动补全交易所后缀
+
+    Args:
+        ts_code: 股票代码（可以是纯数字或带后缀）
+
+    Returns:
+        规范化后的股票代码（带交易所后缀）
+
+    Examples:
+        '000333' -> '000333.SZ'
+        '600519' -> '600519.SH'
+        '000001.SZ' -> '000001.SZ'
+    """
+    if '.' in ts_code:
+        return ts_code.upper()
+
+    code = ts_code.zfill(6)
+
+    if code.startswith(('000', '002', '003', '300')):
+        return f"{code}.SZ"
+    elif code.startswith(('600', '601', '603', '605', '688')):
+        return f"{code}.SH"
+    else:
+        return f"{code}.SZ"
