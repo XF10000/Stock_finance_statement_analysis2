@@ -144,6 +144,9 @@ def main():
     print(f"\n从数据库读取 {ts_code} 的财务数据...")
     data = {}
     
+    # 生成统一的时间戳（用于所有输出文件）
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    
     for table_name in ['balancesheet', 'income', 'cashflow', 'fina_indicator']:
         df = db_manager.get_financial_data(ts_code, table_name, args.start_date, args.end_date)
         if len(df) > 0:
@@ -162,7 +165,7 @@ def main():
         # 如果用户要求，保存分红数据为Excel
         if args.save_dividend_excel:
             os.makedirs(args.output_dir, exist_ok=True)
-            excel_filename = os.path.join(args.output_dir, f"{ts_code}_分红送股.xlsx")
+            excel_filename = os.path.join(args.output_dir, f"{ts_code}_分红送股_{timestamp}.xlsx")
             dividend_df.to_excel(excel_filename, index=False)
             print(f"  ✓ 分红数据已保存到: {excel_filename}")
     else:
@@ -183,7 +186,7 @@ def main():
             df_restructured = restructure_balance_sheet(df_transposed, ts_code=ts_code)
             
             # 保存重构后的数据
-            restructured_filename = os.path.join(args.output_dir, f"{ts_code}_balancesheet_restructured.csv")
+            restructured_filename = os.path.join(args.output_dir, f"{ts_code}_balancesheet_restructured_{timestamp}.csv")
             df_restructured.to_csv(restructured_filename, index=False, encoding='utf-8-sig')
             print(f"✓ 重构后的资产负债表已保存到: {restructured_filename}")
             
@@ -192,7 +195,7 @@ def main():
             
             # 如果需要Excel格式，也保存Excel
             if args.format in ['excel', 'both']:
-                excel_filename = os.path.join(args.output_dir, f"{ts_code}_balancesheet_restructured.xlsx")
+                excel_filename = os.path.join(args.output_dir, f"{ts_code}_balancesheet_restructured_{timestamp}.xlsx")
                 df_restructured.to_excel(excel_filename, index=False)
                 print(f"✓ Excel格式已保存到: {excel_filename}")
         except Exception as e:
@@ -228,7 +231,7 @@ def main():
             )
             
             # 保存重构后的数据
-            restructured_filename = os.path.join(args.output_dir, f"{ts_code}_income_restructured.csv")
+            restructured_filename = os.path.join(args.output_dir, f"{ts_code}_income_restructured_{timestamp}.csv")
             df_restructured.to_csv(restructured_filename, index=False, encoding='utf-8-sig')
             print(f"✓ 重构后的利润表已保存到: {restructured_filename}")
             
@@ -237,7 +240,7 @@ def main():
             
             # 如果需要Excel格式，也保存Excel
             if args.format in ['excel', 'both']:
-                excel_filename = os.path.join(args.output_dir, f"{ts_code}_income_restructured.xlsx")
+                excel_filename = os.path.join(args.output_dir, f"{ts_code}_income_restructured_{timestamp}.xlsx")
                 df_restructured.to_excel(excel_filename, index=False)
                 print(f"✓ Excel格式已保存到: {excel_filename}")
         except Exception as e:
@@ -271,7 +274,7 @@ def main():
             )
             
             # 保存重构后的数据
-            restructured_filename = os.path.join(args.output_dir, f"{ts_code}_cashflow_restructured.csv")
+            restructured_filename = os.path.join(args.output_dir, f"{ts_code}_cashflow_restructured_{timestamp}.csv")
             df_restructured.to_csv(restructured_filename, index=False, encoding='utf-8-sig')
             print(f"✓ 重构后的现金流量表已保存到: {restructured_filename}")
             
@@ -280,7 +283,7 @@ def main():
             
             # 如果需要Excel格式,也保存Excel
             if args.format in ['excel', 'both']:
-                excel_filename = os.path.join(args.output_dir, f"{ts_code}_cashflow_restructured.xlsx")
+                excel_filename = os.path.join(args.output_dir, f"{ts_code}_cashflow_restructured_{timestamp}.xlsx")
                 df_restructured.to_excel(excel_filename, index=False)
                 print(f"✓ Excel格式已保存到: {excel_filename}")
         except Exception as e:
@@ -333,7 +336,7 @@ def main():
                         df_formatted = annual_generator.format_annual_report(df_report, report_name)
                         
                         # 保存CSV
-                        csv_filename = os.path.join(args.output_dir, f"{ts_code}_{report_name}_annual_ttm.csv")
+                        csv_filename = os.path.join(args.output_dir, f"{ts_code}_{report_name}_annual_ttm_{timestamp}.csv")
                         df_formatted.to_csv(csv_filename, index=False, encoding='utf-8-sig')
                         print(f"✓ {report_name}年报+TTM已保存到: {csv_filename}")
                         
@@ -342,7 +345,7 @@ def main():
                         
                         # 如果需要Excel格式，也保存Excel
                         if args.format in ['excel', 'both']:
-                            excel_filename = os.path.join(args.output_dir, f"{ts_code}_{report_name}_annual_ttm.xlsx")
+                            excel_filename = os.path.join(args.output_dir, f"{ts_code}_{report_name}_annual_ttm_{timestamp}.xlsx")
                             df_formatted.to_excel(excel_filename, index=False)
                             print(f"✓ Excel格式已保存到: {excel_filename}")
             else:
@@ -411,7 +414,7 @@ def main():
                 company_name = _name_map.get(ts_code, ts_code.split('.')[0])
                 
                 # 生成HTML报告
-                html_filename = os.path.join(args.output_dir, f"{ts_code}_financial_report.html")
+                html_filename = os.path.join(args.output_dir, f"{ts_code}_financial_report_{timestamp}.html")
                 generator = FinancialStatementsReportGenerator(company_name=company_name, stock_code=ts_code)
                 generator.generate_report(
                     balance_ttm, income_ttm, cashflow_ttm,
@@ -541,9 +544,8 @@ def main():
         
         core_generator = CoreIndicatorsReportGenerator()
         
-        # 生成报告，使用新的文件名格式
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        core_report_path = f"data/{ts_code}_核心指标_{timestamp}.html"
+        # 生成报告，使用统一的时间戳格式
+        core_report_path = f"{args.output_dir}/{ts_code}_核心指标_{timestamp}.html"
         core_generator.generate_report(ts_code, output_path=core_report_path)
         
         print(f"✓ 核心指标报告已生成")
