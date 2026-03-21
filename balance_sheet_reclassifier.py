@@ -351,20 +351,32 @@ def recalculate_lta_after_reclassification(
     ts_code: str,
     balance_raw: pd.DataFrame,
     income_raw: pd.DataFrame,
-    db_manager
+    db_manager,
+    balance_restructured: pd.DataFrame = None
 ) -> int:
     """
     重分类后重新计算 lta_turnover_log 并更新数据库及分位数排名。
 
     计算逻辑与 _calculate_indicator2 完全一致：手动汇总各明细字段，
-    再减去被重分类出「长期经营资产」类别的科目金额。
+    再加减被重分类进/出「长期经营资产」类别的科目金额。
     不使用「长期经营资产合计」小计，以避免引入递延所得税等差异项。
+
+    处理范围（指标2 长期经营资产周转率对数）：
+      - 原始 LTA 字段被移出 LTA：从汇总中减去                      ✓
+      - 原始 LTA 字段被移入 LTA（已在原汇总中，无需操作）：        ✓
+      - 非 LTA 字段被移入 LTA：从 balance_restructured 中读值加上  ✓（需传入）
+      - 非 LTA 字段被移出 LTA（原汇总中本就没有，无需操作）：      ✓
+
+    已知缺口（暂未处理，如需支持请按同样思路扩展）：
+      - 影响指标3（营运净资本比率）的重分类，如将应收账款移至金融资产
 
     Args:
         ts_code: 股票代码
-        balance_raw: 原始资产负债表（宽格式，行=日期，列=字段，与 DB 查询结果格式一致）
+        balance_raw: 原始资产负债表（宽格式，行=日期，列=字段）
         income_raw: 原始利润表（宽格式，行=日期，列=字段）
         db_manager: FinancialDataManager 实例
+        balance_restructured: 重构后资产负债表（长格式，行=项目，列=日期，可选）
+                              当存在「非 LTA 字段移入 LTA」的规则时必须传入
 
     Returns:
         int: 更新的记录数
@@ -391,18 +403,32 @@ def recalculate_lta_after_reclassification(
         '其他非流动资产': 'oth_nca',
     }
 
-    # 仅对「从 LTA 类别移出」且「属于 LTA 字段」的科目做减法
     LTA_CATEGORIES = {'长期经营资产合计'}
+
+    # 从 LTA 移出且属于原始 LTA 字段 → 需要减去
     items_to_subtract: dict = {}  # {cn_name: percentage}
+    # 移入 LTA 且不在原始 LTA 字段中 → 需要加上（原汇总中本没有它）
+    items_to_add: dict = {}       # {cn_name: percentage}
+
     for item_name, rule in rules['reclassify'].items():
         from_cat = rule.get('from', '')
+        to_cat   = rule.get('to', '')
         pct = float(rule.get('percentage', 1.0))
         if from_cat in LTA_CATEGORIES and item_name in LTA_FIELDS:
             items_to_subtract[item_name] = pct
+        if to_cat in LTA_CATEGORIES and item_name not in LTA_FIELDS:
+            # 非 LTA 字段被移入 LTA，需要加入汇总
+            items_to_add[item_name] = pct
 
-    if not items_to_subtract:
+    if not items_to_subtract and not items_to_add:
         logger.info(f"{ts_code}: 重分类规则不涉及 LTA 字段，无需重算 lta_turnover_log")
         return 0
+
+    if items_to_add and balance_restructured is None:
+        logger.warning(
+            f"{ts_code}: 规则中有非 LTA 字段移入 LTA（{list(items_to_add)}），"
+            f"需传入 balance_restructured 才能完整计算，该部分将被跳过"
+        )
 
     analyzer = CoreIndicatorsAnalyzer()
 
@@ -441,6 +467,26 @@ def recalculate_lta_after_reclassification(
     if not lta_by_date:
         logger.warning(f"{ts_code}: 未计算出有效的调整后 LTA 数据")
         return 0
+
+    # 1b. 加上「非 LTA 字段移入 LTA」的科目金额（从 balance_restructured 读取）
+    if items_to_add and balance_restructured is not None:
+        restr_date_cols = [c for c in balance_restructured.columns if c != '项目']
+        for item_name, pct in items_to_add.items():
+            item_rows = balance_restructured[balance_restructured['项目'] == item_name]
+            if len(item_rows) == 0:
+                logger.warning(f"{ts_code}: balance_restructured 中未找到 '{item_name}'，跳过 ADD")
+                continue
+            for col in restr_date_cols:
+                try:
+                    date_str = str(int(float(col)))
+                except (ValueError, TypeError):
+                    date_str = str(col).replace('-', '')
+                if date_str not in lta_by_date:
+                    continue
+                val = item_rows.iloc[0].get(col)
+                if pd.notna(val):
+                    lta_by_date[date_str] += float(val) * pct
+                    logger.debug(f"{ts_code} {date_str}: ADD {item_name} × {pct} = {float(val)*pct:.0f}")
 
     # 2. 计算 TTM 营业收入
     revenue_col = '营业收入' if '营业收入' in income_raw.columns else 'revenue'
