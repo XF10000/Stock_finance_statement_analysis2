@@ -1138,13 +1138,17 @@ class FinancialDataUpdater:
             
             indicators_df = pd.concat(all_indicators, ignore_index=True)
             
-            # 准备批量插入数据
+            # 准备批量插入数据（只写年报日期，非年报 TTM 由 calculate_ttm_indicators_batch 维护）
             insert_data = []
             for _, row in indicators_df.iterrows():
                 # 获取日期字段
                 end_date = row.get('end_date') or row.get('报告期')
                 if isinstance(end_date, str):
                     end_date = end_date.replace('-', '')
+                
+                # 跳过非年报日期，避免 INSERT OR REPLACE 覆盖已有的 is_ttm=1 TTM 条目
+                if not str(end_date).endswith('1231'):
+                    continue
                 
                 insert_data.append((
                     row['ts_code'],
@@ -1604,9 +1608,16 @@ def main():
                         updater.calculate_core_indicators_batch(
                             updated_stocks=[args.update_stock]
                         )
-                        logger.info("✓ 核心指标计算完成")
+                        logger.info("✓ 年报核心指标计算完成")
                     except Exception as e:
-                        logger.error(f"计算核心指标失败: {e}")
+                        logger.error(f"计算年报核心指标失败: {e}")
+                    try:
+                        updater.calculate_ttm_indicators_batch(
+                            updated_stocks=[args.update_stock]
+                        )
+                        logger.info("✓ TTM 核心指标计算完成")
+                    except Exception as e:
+                        logger.error(f"计算 TTM 核心指标失败: {e}")
             else:
                 logger.error(f"\n✗ {args.update_stock} 最新季度数据更新失败")
         
