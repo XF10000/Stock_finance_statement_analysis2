@@ -1591,6 +1591,24 @@ def main():
             success = updater.fetch_stock_all_data(args.update_stock, force_update=True)
             if success:
                 logger.info(f"\n✓ {args.update_stock} 完整历史数据更新成功")
+                
+                # 计算核心指标（与增量更新保持一致）
+                if not args.no_indicators:
+                    logger.info("\n计算核心指标...")
+                    try:
+                        updater.calculate_core_indicators_batch(
+                            updated_stocks=[args.update_stock]
+                        )
+                        logger.info("✓ 年报核心指标计算完成")
+                    except Exception as e:
+                        logger.error(f"计算年报核心指标失败: {e}")
+                    try:
+                        updater.calculate_ttm_indicators_batch(
+                            updated_stocks=[args.update_stock]
+                        )
+                        logger.info("✓ TTM 核心指标计算完成")
+                    except Exception as e:
+                        logger.error(f"计算 TTM 核心指标失败: {e}")
             else:
                 logger.error(f"\n✗ {args.update_stock} 完整历史数据更新失败")
         else:
