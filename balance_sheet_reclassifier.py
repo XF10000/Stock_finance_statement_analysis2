@@ -342,6 +342,129 @@ def recalculate_subtotals(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def recalculate_lta_after_reclassification(
+    ts_code: str,
+    balance_restructured: pd.DataFrame,
+    income_raw: pd.DataFrame,
+    db_manager
+) -> int:
+    """
+    重分类后重新计算 lta_turnover_log 并更新数据库及分位数排名。
+
+    Args:
+        ts_code: 股票代码
+        balance_restructured: 重构后的资产负债表（长格式，行=项目，列=日期）
+        income_raw: 原始利润表（宽格式，行=日期，列=字段）
+        db_manager: FinancialDataManager 实例
+
+    Returns:
+        int: 更新的记录数
+    """
+    import numpy as np
+    from datetime import datetime as _dt
+
+    rules = load_company_rules(ts_code)
+    if not rules or not rules.get('reclassify'):
+        return 0
+
+    # 1. 从重构后的资产负债表中读取 长期经营资产合计
+    lta_row = balance_restructured[balance_restructured['项目'] == '长期经营资产合计']
+    if len(lta_row) == 0:
+        logger.warning(f"{ts_code}: 重构资产负债表中未找到 '长期经营资产合计'，跳过重算")
+        return 0
+
+    date_cols = [c for c in balance_restructured.columns if c != '项目']
+    lta_by_date = {}
+    for col in date_cols:
+        val = lta_row.iloc[0].get(col)
+        if pd.notna(val):
+            lta_by_date[str(col)] = float(val)
+
+    if not lta_by_date:
+        logger.warning(f"{ts_code}: 未找到有效的长期经营资产合计数据")
+        return 0
+
+    # 2. 计算 TTM 营业收入
+    from core_indicators_analyzer import CoreIndicatorsAnalyzer
+    analyzer = CoreIndicatorsAnalyzer()
+
+    revenue_col = '营业收入' if '营业收入' in income_raw.columns else 'revenue'
+    if revenue_col not in income_raw.columns:
+        logger.warning(f"{ts_code}: 利润表中未找到营业收入字段")
+        return 0
+
+    ttm_revenue = analyzer._calculate_ttm_metric(income_raw, revenue_col)
+    if not ttm_revenue:
+        logger.warning(f"{ts_code}: 无法计算 TTM 营业收入")
+        return 0
+
+    # 3. 逐期计算新的 lta_turnover_log
+    updated_values = {}
+    for raw_date, revenue in ttm_revenue.items():
+        # 统一日期格式为纯整数字符串（防止 SQLite 返回 float 如 20231231.0）
+        try:
+            date_str = str(int(float(raw_date)))
+        except (ValueError, TypeError):
+            date_str = str(raw_date).replace('-', '')
+        lta_current = lta_by_date.get(date_str)
+        if lta_current is None:
+            continue
+
+        date_int = int(date_str)
+        year = date_int // 10000
+        month_day = date_int % 10000
+        last_year_date = str((year - 1) * 10000 + month_day)
+        lta_last_year = lta_by_date.get(last_year_date)
+
+        avg_lta = (lta_current + lta_last_year) / 2 if lta_last_year is not None else lta_current
+
+        if avg_lta > 0 and revenue > 0:
+            lta_turnover = revenue / avg_lta
+            updated_values[date_str] = float(np.log(lta_turnover))
+
+    if not updated_values:
+        logger.warning(f"{ts_code}: 没有可更新的 lta_turnover_log 数据")
+        return 0
+
+    # 4. 更新数据库
+    conn = db_manager.get_connection()
+    cursor = conn.cursor()
+    now_str = _dt.now().strftime('%Y-%m-%d %H:%M:%S')
+    updated_count = 0
+
+    for date_str, lta_log in updated_values.items():
+        cursor.execute(
+            'UPDATE core_indicators SET lta_turnover_log = ?, update_time = ? '
+            'WHERE ts_code = ? AND end_date = ?',
+            (lta_log, now_str, ts_code, date_str)
+        )
+        updated_count += cursor.rowcount
+
+    conn.commit()
+    logger.info(f"{ts_code}: 更新了 {updated_count} 条 lta_turnover_log 记录")
+
+    if updated_count == 0:
+        return 0
+
+    # 5. 对受影响的报告期重新计算分位数排名
+    from financial_data_analyzer import FinancialDataAnalyzer
+    fa = FinancialDataAnalyzer(db_manager)
+
+    periods_done = set()
+    for date_str in updated_values:
+        if date_str in periods_done:
+            continue
+        is_ttm = not date_str.endswith('1231')
+        try:
+            fa.update_percentile_ranks(date_str, is_ttm=is_ttm)
+            logger.info(f"{ts_code}: 已重算 {date_str} ({'TTM' if is_ttm else '年报'}) 分位数")
+        except Exception as e:
+            logger.warning(f"重算 {date_str} 分位数失败: {e}")
+        periods_done.add(date_str)
+
+    return updated_count
+
+
 def get_reclassification_summary(ts_code: str) -> str:
     """
     获取重分类规则的摘要信息

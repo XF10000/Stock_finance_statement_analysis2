@@ -462,6 +462,27 @@ def main():
     print("检查核心指标...")
     print("="*60)
     
+    # 若存在公司特定重分类规则，重算 lta_turnover_log 并更新数据库
+    try:
+        from balance_sheet_reclassifier import recalculate_lta_after_reclassification, load_company_rules
+        company_rules = load_company_rules(ts_code)
+        if company_rules and company_rules.get('reclassify'):
+            balance_restructured = data.get('balancesheet_restructured')
+            income_raw = data.get('income')
+            if balance_restructured is not None and income_raw is not None:
+                print(f"  检测到 {ts_code} 存在重分类规则，重算 lta_turnover_log...")
+                updated = recalculate_lta_after_reclassification(
+                    ts_code, balance_restructured, income_raw, db_manager
+                )
+                if updated > 0:
+                    print(f"  ✓ 已更新 {updated} 期 lta_turnover_log（含分位数排名）")
+                else:
+                    print(f"  ⚠️  lta_turnover_log 无可更新记录（可能尚未生成核心指标）")
+    except Exception as e:
+        print(f"  ⚠️  重算 lta_turnover_log 失败: {e}")
+        import traceback
+        traceback.print_exc()
+
     try:
         # 获取三大报表数据
         balance_data = data.get('balancesheet')

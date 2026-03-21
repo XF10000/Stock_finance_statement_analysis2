@@ -4,6 +4,14 @@
 
 company_rules:
   
-  # 在此添加公司特定的重分类规则
+  # 美的集团：将其他非流动资产从经营资产重分类为金融资产
+  "000333.SZ":
+    reclassify:
+      其他非流动资产:
+        from: 长期经营资产合计
+        to: 金融资产合计
+        reason: "固定收益类产品，实质为金融资产"
+  
+  # 在此添加其他公司特定的重分类规则
   # 示例格式请参考 company_specific_rules.yaml.template
   
