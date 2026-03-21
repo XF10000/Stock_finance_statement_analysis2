@@ -245,6 +245,11 @@ def reclassify_item(df: pd.DataFrame, item_name: str, from_category: str,
         
     else:
         # 部分重分类：需要拆分科目
+        # 确保日期列为 float，避免 int64 列写入浮点数报 TypeError
+        for col in date_columns:
+            if col in df.columns:
+                df[col] = df[col].astype(float)
+        
         # 1. 调整原科目的金额为 (1 - percentage)
         for col in date_columns:
             if pd.notna(df.loc[item_idx, col]):
