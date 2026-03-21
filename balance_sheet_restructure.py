@@ -8,6 +8,14 @@ import numpy as np
 from typing import Dict, List, Optional
 import logging
 
+# 导入重分类模块
+try:
+    from balance_sheet_reclassifier import apply_reclassification
+    RECLASSIFIER_AVAILABLE = True
+except ImportError:
+    RECLASSIFIER_AVAILABLE = False
+    logging.warning("balance_sheet_reclassifier 模块未找到，公司特定重分类功能将不可用")
+
 
 # ============================================================================
 # 统一字段名映射（支持英文和中文字段名）
@@ -315,18 +323,22 @@ EQUITY_NEGATIVE_FIELDS = [
 # 资产负债表重构函数
 # ============================================================================
 
-def restructure_balance_sheet(df: pd.DataFrame) -> pd.DataFrame:
+def restructure_balance_sheet(df: pd.DataFrame, ts_code: Optional[str] = None) -> pd.DataFrame:
     """
     重构资产负债表：将传统结构转换为资产-资本结构
     
     Args:
         df: 转置后的资产负债表（行=报告期，列=项目）
+        ts_code: 股票代码（可选），用于应用公司特定的重分类规则
         
     Returns:
         重构后的资产负债表（行=项目，列=报告期）
     """
     logger = logging.getLogger(__name__)
     logger.info("开始重构资产负债表...")
+    
+    if ts_code:
+        logger.info(f"股票代码: {ts_code}")
     
     # 确保所有列名都是字符串类型（避免整数列名导致的匹配失败）
     df = df.copy()
@@ -654,6 +666,15 @@ def restructure_balance_sheet(df: pd.DataFrame) -> pd.DataFrame:
     df_result = df_result.rename(columns={'index': '项目'})
     
     logger.info(f"资产负债表重构完成，共 {len(df_result)} 个项目")
+    
+    # 应用公司特定的重分类规则
+    if ts_code and RECLASSIFIER_AVAILABLE:
+        try:
+            logger.info("检查是否有公司特定的重分类规则...")
+            df_result = apply_reclassification(df_result, ts_code)
+        except Exception as e:
+            logger.error(f"应用重分类规则时出错: {e}")
+            logger.warning("将返回未重分类的结果")
     
     return df_result
 

@@ -213,7 +213,7 @@ def main():
             df_transposed = transpose_data(df_balance)
             
             # 重构资产负债表（总股本已包含在资产负债表的 data_json 中）
-            df_restructured = restructure_balance_sheet(df_transposed)
+            df_restructured = restructure_balance_sheet(df_transposed, ts_code=ts_code)
             
             # 保存重构后的数据
             restructured_filename = os.path.join(args.output_dir, f"{ts_code}_balancesheet_restructured.csv")

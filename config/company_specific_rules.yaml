@@ -1,0 +1,9 @@
+# 资产负债表公司特定重分类规则配置文件
+# 
+# 详细说明请参考：docs/Company_Specific_Reclassification_Requirements.md
+
+company_rules:
+  
+  # 在此添加公司特定的重分类规则
+  # 示例格式请参考 company_specific_rules.yaml.template
+  
