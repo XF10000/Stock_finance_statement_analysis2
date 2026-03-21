@@ -836,7 +836,7 @@ class FinancialDataUpdater:
             self.logger.info("="*60)
             
             self.calculate_core_indicators_batch(target_quarter)
-            self.calculate_ttm_indicators_batch()
+            self.calculate_ttm_indicators_batch(target_quarter=target_quarter)
     
     def update_dividend_and_totalshares(self):
         """
@@ -1213,13 +1213,15 @@ class FinancialDataUpdater:
         self.logger.info(f"核心指标计算完成: 成功 {success_count} 只，失败 {failed_count} 只")
         self.logger.info("="*60)
     
-    def calculate_ttm_indicators_batch(self, updated_stocks: List[str] = None):
+    def calculate_ttm_indicators_batch(self, updated_stocks: List[str] = None,
+                                       target_quarter: str = None):
         """
         批量计算 TTM 核心指标
         为每个季度（Q1/Q2/Q3/Q4）生成 TTM 指标并存储到数据库
         
         Args:
             updated_stocks: 本次更新的股票列表，只计算这些股票的指标
+            target_quarter: 只计算该季度的 TTM 指标（增量更新时使用），不指定则计算所有季度
         """
         from core_indicators_analyzer import CoreIndicatorsAnalyzer
         from ttm_generator import TTMGenerator
@@ -1295,6 +1297,10 @@ class FinancialDataUpdater:
                     try:
                         # 年报季度（1231）不需要计算 TTM，因为年报本身就是完整年度数据
                         if quarter.endswith('1231'):
+                            continue
+                        
+                        # 增量模式：只计算指定季度
+                        if target_quarter and quarter != target_quarter:
                             continue
                         
                         # 生成 TTM 财务数据
@@ -1628,19 +1634,21 @@ def main():
             if success:
                 logger.info(f"\n✓ {args.update_stock} 最新季度数据更新成功")
                 
-                # 计算核心指标
+                # 计算核心指标（只计算目标季度，不重算全部历史）
                 if not args.no_indicators:
-                    logger.info("\n计算核心指标...")
+                    logger.info(f"\n计算 {target_quarter} 核心指标...")
                     try:
                         updater.calculate_core_indicators_batch(
-                            updated_stocks=[args.update_stock]
+                            updated_stocks=[args.update_stock],
+                            target_quarter=target_quarter
                         )
                         logger.info("✓ 年报核心指标计算完成")
                     except Exception as e:
                         logger.error(f"计算年报核心指标失败: {e}")
                     try:
                         updater.calculate_ttm_indicators_batch(
-                            updated_stocks=[args.update_stock]
+                            updated_stocks=[args.update_stock],
+                            target_quarter=target_quarter
                         )
                         logger.info("✓ TTM 核心指标计算完成")
                     except Exception as e:
