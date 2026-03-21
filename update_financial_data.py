@@ -1601,7 +1601,9 @@ def main():
                 if not args.no_indicators:
                     logger.info("\n计算核心指标...")
                     try:
-                        updater.calculate_core_indicators_single(args.update_stock, target_quarter)
+                        updater.calculate_core_indicators_batch(
+                            updated_stocks=[args.update_stock]
+                        )
                         logger.info("✓ 核心指标计算完成")
                     except Exception as e:
                         logger.error(f"计算核心指标失败: {e}")
