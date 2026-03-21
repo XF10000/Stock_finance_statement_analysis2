@@ -836,6 +836,7 @@ class FinancialDataUpdater:
             self.logger.info("="*60)
             
             self.calculate_core_indicators_batch(target_quarter)
+            self.calculate_ttm_indicators_batch()
     
     def update_dividend_and_totalshares(self):
         """
