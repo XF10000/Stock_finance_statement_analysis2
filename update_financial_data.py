@@ -588,9 +588,13 @@ class FinancialDataUpdater:
                     self.stats['skipped'] += 1
                 return True
             
-            # 获取该季度的数据（前后各扩展30天）
-            start_date = str(int(target_quarter) - 100)  # 往前推一个月
-            end_date = str(int(target_quarter) + 100)    # 往后推一个月
+            # start_date：报告期前30天；end_date：今天（ann_date 可能在报告期数月后）
+            # 例：2025Q4 报告期=20251231，但年报通常在2026年3-4月公告，
+            # 若 end_date 截止到20260130，会漏掉后续公告的年报
+            from datetime import timedelta
+            tq_dt = datetime.strptime(target_quarter, '%Y%m%d')
+            start_date = (tq_dt - timedelta(days=30)).strftime('%Y%m%d')
+            end_date   = datetime.now().strftime('%Y%m%d')
             
             self.logger.info(f"获取 {ts_code} 的 {target_quarter} 季度数据...")
             data = client.get_all_financial_data(
@@ -1588,7 +1592,11 @@ def main():
         
         if args.full:
             # 完整更新
-            success = updater.fetch_stock_all_data(args.update_stock, force_update=True)
+            updater.start_batch_writer()
+            try:
+                success = updater.fetch_stock_all_data(args.update_stock, force_update=True)
+            finally:
+                updater.stop_batch_writer()
             if success:
                 logger.info(f"\n✓ {args.update_stock} 完整历史数据更新成功")
                 
@@ -1616,7 +1624,11 @@ def main():
             target_quarter = args.quarter if args.quarter else updater._determine_target_quarter_smart()
             logger.info(f"目标季度: {target_quarter}")
             
-            success = updater.fetch_stock_incremental(args.update_stock, target_quarter)
+            updater.start_batch_writer()
+            try:
+                success = updater.fetch_stock_incremental(args.update_stock, target_quarter)
+            finally:
+                updater.stop_batch_writer()
             if success:
                 logger.info(f"\n✓ {args.update_stock} 最新季度数据更新成功")
                 
