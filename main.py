@@ -467,12 +467,12 @@ def main():
         from balance_sheet_reclassifier import recalculate_lta_after_reclassification, load_company_rules
         company_rules = load_company_rules(ts_code)
         if company_rules and company_rules.get('reclassify'):
-            balance_restructured = data.get('balancesheet_restructured')
+            balance_raw = data.get('balancesheet')
             income_raw = data.get('income')
-            if balance_restructured is not None and income_raw is not None:
+            if balance_raw is not None and income_raw is not None:
                 print(f"  检测到 {ts_code} 存在重分类规则，重算 lta_turnover_log...")
                 updated = recalculate_lta_after_reclassification(
-                    ts_code, balance_restructured, income_raw, db_manager
+                    ts_code, balance_raw, income_raw, db_manager
                 )
                 if updated > 0:
                     print(f"  ✓ 已更新 {updated} 期 lta_turnover_log（含分位数排名）")

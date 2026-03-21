@@ -481,17 +481,11 @@ class CoreIndicatorsAnalyzer:
             
             return total if total > 0 else np.nan
         
-        # 优先使用预计算的长期经营资产合计（已反映公司特定重分类规则）
-        # 如果数据来自重构后的资产负债表，该字段会包含正确的分类调整
-        lta_current = self._safe_get_value(balance_current, '长期经营资产合计')
-        if pd.isna(lta_current):
-            lta_current = get_long_term_assets(balance_current)
+        lta_current = get_long_term_assets(balance_current)
         
         # 计算平均长期经营资产（使用去年同期的平均值，消除季节性波动）
         if balance_last_year is not None:
-            lta_last_year = self._safe_get_value(balance_last_year, '长期经营资产合计')
-            if pd.isna(lta_last_year):
-                lta_last_year = get_long_term_assets(balance_last_year)
+            lta_last_year = get_long_term_assets(balance_last_year)
             if pd.notna(lta_current) and pd.notna(lta_last_year):
                 avg_lta = (lta_current + lta_last_year) / 2
             else:

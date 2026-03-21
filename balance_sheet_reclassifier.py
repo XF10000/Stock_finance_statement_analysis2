@@ -349,16 +349,20 @@ def recalculate_subtotals(df: pd.DataFrame) -> pd.DataFrame:
 
 def recalculate_lta_after_reclassification(
     ts_code: str,
-    balance_restructured: pd.DataFrame,
+    balance_raw: pd.DataFrame,
     income_raw: pd.DataFrame,
     db_manager
 ) -> int:
     """
     重分类后重新计算 lta_turnover_log 并更新数据库及分位数排名。
 
+    计算逻辑与 _calculate_indicator2 完全一致：手动汇总各明细字段，
+    再减去被重分类出「长期经营资产」类别的科目金额。
+    不使用「长期经营资产合计」小计，以避免引入递延所得税等差异项。
+
     Args:
         ts_code: 股票代码
-        balance_restructured: 重构后的资产负债表（长格式，行=项目，列=日期）
+        balance_raw: 原始资产负债表（宽格式，行=日期，列=字段，与 DB 查询结果格式一致）
         income_raw: 原始利润表（宽格式，行=日期，列=字段）
         db_manager: FinancialDataManager 实例
 
@@ -367,32 +371,78 @@ def recalculate_lta_after_reclassification(
     """
     import numpy as np
     from datetime import datetime as _dt
+    from core_indicators_analyzer import CoreIndicatorsAnalyzer
 
     rules = load_company_rules(ts_code)
     if not rules or not rules.get('reclassify'):
         return 0
 
-    # 1. 从重构后的资产负债表中读取 长期经营资产合计
-    lta_row = balance_restructured[balance_restructured['项目'] == '长期经营资产合计']
-    if len(lta_row) == 0:
-        logger.warning(f"{ts_code}: 重构资产负债表中未找到 '长期经营资产合计'，跳过重算")
+    # _calculate_indicator2 使用的 LTA 字段（中文名 → 英文名）
+    LTA_FIELDS = {
+        '固定资产':       'fix_assets',
+        '在建工程':       'cip',
+        '生产性生物资产': 'produc_bio_assets',
+        '油气资产':       'oil_and_gas_assets',
+        '使用权资产':     'use_right_assets',
+        '无形资产':       'intan_assets',
+        '开发支出':       'r_and_d',
+        '商誉':           'goodwill',
+        '长期待摊费用':   'lt_amor_exp',
+        '其他非流动资产': 'oth_nca',
+    }
+
+    # 仅对「从 LTA 类别移出」且「属于 LTA 字段」的科目做减法
+    LTA_CATEGORIES = {'长期经营资产合计'}
+    items_to_subtract: dict = {}  # {cn_name: percentage}
+    for item_name, rule in rules['reclassify'].items():
+        from_cat = rule.get('from', '')
+        pct = float(rule.get('percentage', 1.0))
+        if from_cat in LTA_CATEGORIES and item_name in LTA_FIELDS:
+            items_to_subtract[item_name] = pct
+
+    if not items_to_subtract:
+        logger.info(f"{ts_code}: 重分类规则不涉及 LTA 字段，无需重算 lta_turnover_log")
         return 0
 
-    date_cols = [c for c in balance_restructured.columns if c != '项目']
-    lta_by_date = {}
-    for col in date_cols:
-        val = lta_row.iloc[0].get(col)
-        if pd.notna(val):
-            lta_by_date[str(col)] = float(val)
+    analyzer = CoreIndicatorsAnalyzer()
+
+    # 确定日期列
+    date_col = '报告期' if '报告期' in balance_raw.columns else 'end_date'
+
+    # 1. 逐期计算调整后的 LTA（原公式汇总 − 被重分类金额）
+    lta_by_date: dict = {}
+    for _, row in balance_raw.iterrows():
+        raw_date = row[date_col]
+        try:
+            date_str = str(int(float(raw_date)))
+        except (ValueError, TypeError):
+            date_str = str(raw_date).replace('-', '')
+
+        original_lta = 0.0
+        for cn_name, en_name in LTA_FIELDS.items():
+            val = analyzer._safe_get_value(row, cn_name, en_name)
+            if pd.notna(val):
+                original_lta += float(val)
+
+        if original_lta <= 0:
+            continue
+
+        subtract = 0.0
+        for item_name, pct in items_to_subtract.items():
+            en_name = LTA_FIELDS[item_name]
+            val = analyzer._safe_get_value(row, item_name, en_name)
+            if pd.notna(val):
+                subtract += float(val) * pct
+
+        adjusted_lta = original_lta - subtract
+        if adjusted_lta > 0:
+            lta_by_date[date_str] = adjusted_lta
 
     if not lta_by_date:
-        logger.warning(f"{ts_code}: 未找到有效的长期经营资产合计数据")
+        logger.warning(f"{ts_code}: 未计算出有效的调整后 LTA 数据")
         return 0
 
     # 2. 计算 TTM 营业收入
-    from core_indicators_analyzer import CoreIndicatorsAnalyzer
-    analyzer = CoreIndicatorsAnalyzer()
-
     revenue_col = '营业收入' if '营业收入' in income_raw.columns else 'revenue'
     if revenue_col not in income_raw.columns:
         logger.warning(f"{ts_code}: 利润表中未找到营业收入字段")
@@ -404,28 +454,26 @@ def recalculate_lta_after_reclassification(
         return 0
 
     # 3. 逐期计算新的 lta_turnover_log
-    updated_values = {}
+    updated_values: dict = {}
     for raw_date, revenue in ttm_revenue.items():
-        # 统一日期格式为纯整数字符串（防止 SQLite 返回 float 如 20231231.0）
         try:
             date_str = str(int(float(raw_date)))
         except (ValueError, TypeError):
             date_str = str(raw_date).replace('-', '')
+
         lta_current = lta_by_date.get(date_str)
         if lta_current is None:
             continue
 
         date_int = int(date_str)
-        year = date_int // 10000
-        month_day = date_int % 10000
+        year, month_day = date_int // 10000, date_int % 10000
         last_year_date = str((year - 1) * 10000 + month_day)
         lta_last_year = lta_by_date.get(last_year_date)
 
         avg_lta = (lta_current + lta_last_year) / 2 if lta_last_year is not None else lta_current
 
         if avg_lta > 0 and revenue > 0:
-            lta_turnover = revenue / avg_lta
-            updated_values[date_str] = float(np.log(lta_turnover))
+            updated_values[date_str] = float(np.log(revenue / avg_lta))
 
     if not updated_values:
         logger.warning(f"{ts_code}: 没有可更新的 lta_turnover_log 数据")
@@ -455,7 +503,7 @@ def recalculate_lta_after_reclassification(
     from financial_data_analyzer import FinancialDataAnalyzer
     fa = FinancialDataAnalyzer(db_manager)
 
-    periods_done = set()
+    periods_done: set = set()
     for date_str in updated_values:
         if date_str in periods_done:
             continue
