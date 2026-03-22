@@ -478,36 +478,54 @@ def restructure_balance_sheet(df: pd.DataFrame, ts_code: Optional[str] = None) -
     restructured_data['长期经营资产合计'] = long_term_operating_assets
     
     # 添加长期经营资产明细
+    # 先获取固定资产和固定资产合计的数据
+    fix_assets = None
+    fix_assets_total = None
+    
+    if '固定资产' in df_data.index:
+        try:
+            val = df_data.loc['固定资产']
+            if isinstance(val, pd.DataFrame):
+                val = val.iloc[0]
+            fix_assets = pd.to_numeric(val, errors='coerce')
+        except:
+            pass
+    
+    if '固定资产合计' in df_data.index:
+        try:
+            val = df_data.loc['固定资产合计']
+            if isinstance(val, pd.DataFrame):
+                val = val.iloc[0]
+            fix_assets_total = pd.to_numeric(val, errors='coerce')
+        except:
+            pass
+    
+    # 智能选择：逐期判断使用哪个字段，并生成统一的"固定资产"输出
+    if fix_assets is not None or fix_assets_total is not None:
+        merged_fixed_assets = pd.Series(index=date_columns, dtype=float)
+        for date in date_columns:
+            # 优先使用固定资产合计
+            if fix_assets_total is not None and pd.notna(fix_assets_total.get(date)):
+                merged_fixed_assets[date] = fix_assets_total.get(date)
+            # 如果固定资产合计为空，使用固定资产
+            elif fix_assets is not None and pd.notna(fix_assets.get(date)):
+                merged_fixed_assets[date] = fix_assets.get(date)
+            else:
+                merged_fixed_assets[date] = None
+        
+        restructured_data['固定资产'] = merged_fixed_assets
+    
+    # 添加其他长期经营资产明细（跳过固定资产和固定资产合计）
     for field in LONG_TERM_OPERATING_ASSETS_FIELDS:
+        if field in ['固定资产', '固定资产合计']:
+            continue  # 已经智能处理过了
+        
         if field in df_data.index:
             try:
                 val = df_data.loc[field]
                 if isinstance(val, pd.DataFrame):
                     val = val.iloc[0]
-                
-                # 特殊处理固定资产：如果为空，使用固定资产合计的值
-                if field == '固定资产':
-                    # 获取固定资产合计的值
-                    fix_assets_total_val = None
-                    if '固定资产合计' in df_data.index:
-                        try:
-                            fix_assets_total_val = df_data.loc['固定资产合计']
-                            if isinstance(fix_assets_total_val, pd.DataFrame):
-                                fix_assets_total_val = fix_assets_total_val.iloc[0]
-                        except:
-                            pass
-                    
-                    # 逐期填充：如果固定资产为空，使用固定资产合计
-                    if fix_assets_total_val is not None:
-                        merged_val = val.copy()
-                        for date_col in date_columns:
-                            if pd.isna(merged_val.get(date_col)) and pd.notna(fix_assets_total_val.get(date_col)):
-                                merged_val[date_col] = fix_assets_total_val.get(date_col)
-                        restructured_data[field] = merged_val
-                    else:
-                        restructured_data[field] = val
-                else:
-                    restructured_data[field] = val
+                restructured_data[field] = val
             except:
                 pass
     
@@ -636,7 +654,7 @@ def restructure_balance_sheet(df: pd.DataFrame, ts_code: Optional[str] = None) -
         '其他流动负债', '预计负债(流动)', '预计负债(非流动)',
         '一年内到期的递延收益', '递延收益-非流动负债',
         '长期经营资产合计',
-        '固定资产', '固定资产合计', '在建工程合计', '生产性生物资产', '油气资产',
+        '固定资产', '在建工程合计', '生产性生物资产', '油气资产',
         '使用权资产', '无形资产', '开发支出', '商誉', '长期待摊费用',
         '其他非流动资产', '递延所得税资产', '递延所得税负债(减项)',
         '资产总额',
