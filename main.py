@@ -5,10 +5,11 @@
 import argparse
 from datetime import datetime
 from financial_data_manager import FinancialDataManager, normalize_stock_code
-from balance_sheet_restructure import restructure_balance_sheet
+from balance_sheet_restructure import restructure_balance_sheet, transpose_data
 from income_statement_restructure import restructure_income_statement
 from cashflow_statement_restructure import restructure_cashflow_statement
 from annual_report_generator import AnnualReportGenerator
+from excel_styled_exporter import save_balance_sheet_to_excel_styled
 import os
 import yaml
 import pandas as pd
@@ -193,10 +194,10 @@ def main():
             # 添加到data字典
             data['balancesheet_restructured'] = df_restructured
             
-            # 如果需要Excel格式，也保存Excel
+            # 如果需要Excel格式，也保存Excel（带样式）
             if args.format in ['excel', 'both']:
                 excel_filename = os.path.join(args.output_dir, f"{ts_code}_balancesheet_restructured_{timestamp}.xlsx")
-                df_restructured.to_excel(excel_filename, index=False)
+                save_balance_sheet_to_excel_styled(df_restructured, excel_filename)
                 print(f"✓ Excel格式已保存到: {excel_filename}")
         except Exception as e:
             print(f"⚠️  资产负债表重构失败: {e}")
