@@ -5,11 +5,10 @@
 import argparse
 from datetime import datetime
 from financial_data_manager import FinancialDataManager, normalize_stock_code
-from balance_sheet_restructure import restructure_balance_sheet, transpose_data
+from balance_sheet_restructure import restructure_balance_sheet
 from income_statement_restructure import restructure_income_statement
 from cashflow_statement_restructure import restructure_cashflow_statement
 from annual_report_generator import AnnualReportGenerator
-from excel_styled_exporter import save_balance_sheet_to_excel_styled
 import os
 import yaml
 import pandas as pd
@@ -186,19 +185,15 @@ def main():
             # 重构资产负债表（总股本已包含在资产负债表的 data_json 中）
             df_restructured = restructure_balance_sheet(df_transposed, ts_code=ts_code)
             
-            # 保存重构后的数据
-            restructured_filename = os.path.join(args.output_dir, f"{ts_code}_balancesheet_restructured_{timestamp}.csv")
-            df_restructured.to_csv(restructured_filename, index=False, encoding='utf-8-sig')
-            print(f"✓ 重构后的资产负债表已保存到: {restructured_filename}")
+            # 保存重构后的数据（格式化Excel）
+            from excel_formatter import save_formatted_balance_sheet
+            
+            excel_filename = os.path.join(args.output_dir, f"{ts_code}_balancesheet_restructured_{timestamp}.xlsx")
+            save_formatted_balance_sheet(df_restructured, excel_filename)
+            print(f"✓ 重构后的资产负债表已保存到: {excel_filename}")
             
             # 添加到data字典
             data['balancesheet_restructured'] = df_restructured
-            
-            # 如果需要Excel格式，也保存Excel（带样式）
-            if args.format in ['excel', 'both']:
-                excel_filename = os.path.join(args.output_dir, f"{ts_code}_balancesheet_restructured_{timestamp}.xlsx")
-                save_balance_sheet_to_excel_styled(df_restructured, excel_filename)
-                print(f"✓ Excel格式已保存到: {excel_filename}")
         except Exception as e:
             print(f"⚠️  资产负债表重构失败: {e}")
     
@@ -231,19 +226,15 @@ def main():
                 equity_cost_rate=equity_cost_rate
             )
             
-            # 保存重构后的数据
-            restructured_filename = os.path.join(args.output_dir, f"{ts_code}_income_restructured_{timestamp}.csv")
-            df_restructured.to_csv(restructured_filename, index=False, encoding='utf-8-sig')
-            print(f"✓ 重构后的利润表已保存到: {restructured_filename}")
+            # 保存重构后的数据（格式化Excel）
+            from excel_formatter import save_formatted_income_statement
+            
+            excel_filename = os.path.join(args.output_dir, f"{ts_code}_income_restructured_{timestamp}.xlsx")
+            save_formatted_income_statement(df_restructured, excel_filename)
+            print(f"✓ 重构后的利润表已保存到: {excel_filename}")
             
             # 添加到data字典
             data['income_restructured'] = df_restructured
-            
-            # 如果需要Excel格式，也保存Excel
-            if args.format in ['excel', 'both']:
-                excel_filename = os.path.join(args.output_dir, f"{ts_code}_income_restructured_{timestamp}.xlsx")
-                df_restructured.to_excel(excel_filename, index=False)
-                print(f"✓ Excel格式已保存到: {excel_filename}")
         except Exception as e:
             print(f"⚠️  利润表重构失败: {e}")
     
@@ -274,19 +265,15 @@ def main():
                 income_restructured=income_restructured
             )
             
-            # 保存重构后的数据
-            restructured_filename = os.path.join(args.output_dir, f"{ts_code}_cashflow_restructured_{timestamp}.csv")
-            df_restructured.to_csv(restructured_filename, index=False, encoding='utf-8-sig')
-            print(f"✓ 重构后的现金流量表已保存到: {restructured_filename}")
+            # 保存重构后的数据（格式化Excel）
+            from excel_formatter import save_formatted_cashflow_statement
+            
+            excel_filename = os.path.join(args.output_dir, f"{ts_code}_cashflow_restructured_{timestamp}.xlsx")
+            save_formatted_cashflow_statement(df_restructured, excel_filename)
+            print(f"✓ 重构后的现金流量表已保存到: {excel_filename}")
             
             # 添加到data字典
             data['cashflow_restructured'] = df_restructured
-            
-            # 如果需要Excel格式,也保存Excel
-            if args.format in ['excel', 'both']:
-                excel_filename = os.path.join(args.output_dir, f"{ts_code}_cashflow_restructured_{timestamp}.xlsx")
-                df_restructured.to_excel(excel_filename, index=False)
-                print(f"✓ Excel格式已保存到: {excel_filename}")
         except Exception as e:
             print(f"⚠️  现金流量表重构失败: {e}")
     
@@ -330,25 +317,32 @@ def main():
                     years=years
                 )
                 
-                # 保存年报+TTM报表
+                # 保存年报+TTM报表（格式化Excel）
+                from excel_formatter import save_formatted_balance_sheet, save_formatted_income_statement, save_formatted_cashflow_statement
+                
                 for report_name, df_report in annual_reports.items():
                     if df_report is not None and len(df_report) > 0:
                         # 格式化
                         df_formatted = annual_generator.format_annual_report(df_report, report_name)
                         
-                        # 保存CSV
-                        csv_filename = os.path.join(args.output_dir, f"{ts_code}_{report_name}_annual_ttm_{timestamp}.csv")
-                        df_formatted.to_csv(csv_filename, index=False, encoding='utf-8-sig')
-                        print(f"✓ {report_name}年报+TTM已保存到: {csv_filename}")
+                        # 保存格式化Excel
+                        excel_filename = os.path.join(args.output_dir, f"{ts_code}_{report_name}_annual_ttm_{timestamp}.xlsx")
+                        
+                        # 根据报表类型选择对应的格式化函数
+                        if 'balance' in report_name:
+                            save_formatted_balance_sheet(df_formatted, excel_filename)
+                        elif 'income' in report_name:
+                            save_formatted_income_statement(df_formatted, excel_filename)
+                        elif 'cashflow' in report_name:
+                            save_formatted_cashflow_statement(df_formatted, excel_filename)
+                        else:
+                            # 默认使用资产负债表格式
+                            save_formatted_balance_sheet(df_formatted, excel_filename)
+                        
+                        print(f"✓ {report_name}年报+TTM已保存到: {excel_filename}")
                         
                         # 添加到data字典
                         data[f'{report_name}_annual_ttm'] = df_formatted
-                        
-                        # 如果需要Excel格式，也保存Excel
-                        if args.format in ['excel', 'both']:
-                            excel_filename = os.path.join(args.output_dir, f"{ts_code}_{report_name}_annual_ttm_{timestamp}.xlsx")
-                            df_formatted.to_excel(excel_filename, index=False)
-                            print(f"✓ Excel格式已保存到: {excel_filename}")
             else:
                 print("⚠️  缺少重构数据，无法生成年报+TTM报表")
         except Exception as e:
