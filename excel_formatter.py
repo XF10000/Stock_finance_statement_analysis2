@@ -5,9 +5,55 @@ Excel格式化输出模块
 
 import pandas as pd
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, numbers
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.utils import get_column_letter
 from typing import List, Optional
+
+
+# 比率类型项目的关键词列表（这些项目的值将显示为百分比格式）
+RATIO_KEYWORDS = [
+    '率', '比例', '占比',
+    '营业成本率',
+    '毛利率',
+    '销售费用率',
+    '管理费用率',
+    '研发费用率',
+    '资产减值损失率',
+    '营业外收支及其他占营业收入的比例',
+    '息税前经营利润率',
+    '实际所得税税率',
+    '口径一收入现金含量',
+    '成本费用付现率',
+    '净利润现金含量',
+    '非付现成本费用比经营活动产生的现金流量净额',
+    '长期经营资产扩张性资本支出比例',
+    '扩张性资本支出占长期资产期初净额的比例',
+    '现金含量',
+    '付现率',
+    '营业收入占比',
+    '费用率',
+    '损失率',
+    '税率',
+    '利润率',
+    '周转率',
+]
+
+
+def is_ratio_item(item_name: str) -> bool:
+    """
+    判断项目名称是否为比率类型
+    
+    Args:
+        item_name: 项目名称
+        
+    Returns:
+        是否为比率类型
+    """
+    if not item_name:
+        return False
+    item_name = str(item_name)
+    return any(keyword in item_name for keyword in RATIO_KEYWORDS)
 
 
 def save_formatted_balance_sheet(df: pd.DataFrame, filename: str, 
@@ -31,6 +77,10 @@ def save_formatted_balance_sheet(df: pd.DataFrame, filename: str,
     
     # 写入数据
     for r_idx, row in enumerate(dataframe_to_rows(df, index=False, header=True), 1):
+        # 获取第一列的值（项目名称）
+        item_name = row[0] if len(row) > 0 else None
+        is_ratio = is_ratio_item(item_name) if r_idx > 1 else False
+        
         for c_idx, value in enumerate(row, 1):
             cell = ws.cell(row=r_idx, column=c_idx, value=value)
             
@@ -47,18 +97,21 @@ def save_formatted_balance_sheet(df: pd.DataFrame, filename: str,
                 cell.alignment = Alignment(horizontal='center', vertical='center')
             else:
                 # 检查是否需要高亮
-                first_col_value = ws.cell(row=r_idx, column=1).value
-                if first_col_value and any(keyword in str(first_col_value) for keyword in highlight_keywords):
+                if item_name and any(keyword in str(item_name) for keyword in highlight_keywords):
                     cell.font = Font(bold=True, size=10)
                     cell.fill = PatternFill(start_color='FFFFCC', end_color='FFFFCC', fill_type='solid')
                 
-                # 数字格式：千分位分隔，无小数
+                # 数字格式
                 if c_idx > 1 and isinstance(value, (int, float)):
-                    cell.number_format = '#,##0'
+                    if is_ratio:
+                        # 比率类型：显示为百分比，1位小数
+                        cell.number_format = '0.0%'
+                    else:
+                        # 金额类型：千分位分隔，无小数
+                        cell.number_format = '#,##0'
     
     # 设置列宽
-    from openpyxl.utils import get_column_letter
-    ws.column_dimensions['A'].width = 30
+    ws.column_dimensions['A'].width = 35
     for col in range(2, len(df.columns) + 2):
         col_letter = get_column_letter(col)
         ws.column_dimensions[col_letter].width = 15
