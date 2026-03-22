@@ -199,9 +199,13 @@ def apply_reclassification(df: pd.DataFrame, ts_code: str) -> pd.DataFrame:
         
         reclassified_count += 1
     
-    # 重新计算小计和合计
+    # 重新计算小计和合计（含级联更新父级合计）
     logger.info("重新计算小计和合计...")
     df = recalculate_subtotals(df)
+    
+    # 将重分类行物理移动到目标区段
+    logger.info("调整行顺序：将重分类项目移至目标区段...")
+    df = reorder_reclassified_items(df, reclassify_rules)
     
     logger.info(f"重分类完成，共处理 {reclassified_count} 个科目")
     
@@ -274,12 +278,53 @@ def reclassify_item(df: pd.DataFrame, item_name: str, from_category: str,
     return df
 
 
+
+# 当某个直接小计发生变化时，需要级联更新的父级合计
+# 格式: {变化的直接小计: [需要同方向更新的父级合计列表]}
+_CASCADE_PARENTS = {
+    '长期经营资产合计':             ['经营资产合计'],
+    '周转性经营投入合计':           ['经营资产合计'],
+    '短期债务':                     ['有息债务合计', '资本总额'],
+    '长期债务':                     ['有息债务合计', '资本总额'],
+    '有息债务合计':                 ['资本总额'],
+    '归属于母公司股东权益合计':     ['所有者权益合计', '资本总额'],
+    '少数股东权益':                 ['所有者权益合计', '资本总额'],
+    '所有者权益合计':               ['资本总额'],
+}
+
+# 重分类后，被移动项目应插入到目标区段的哪个"锚点行"之前
+# 格式: {目标分类: 紧跟在目标区段之后的第一行（锚点）}
+_SECTION_INSERT_BEFORE = {
+    '金融资产合计':         '长期股权投资',
+    '长期经营资产合计':     '资产总额',
+    '营运资产小计':         '营运负债小计',
+    '营运负债小计':         '长期经营资产合计',
+    '周转性经营投入合计':   '长期经营资产合计',
+    '短期债务':             '长期债务',
+    '长期债务':             '所有者权益合计',
+}
+
+
+def _update_row(df: pd.DataFrame, row_name: str,
+                date_columns: list, delta: pd.Series) -> None:
+    """在DataFrame中找到指定行并加上delta（in-place）。"""
+    idx_list = df[df['项目'] == row_name].index
+    if len(idx_list) == 0:
+        return
+    idx = idx_list[0]
+    for col in date_columns:
+        d = delta.get(col)
+        if d is None or pd.isna(d):
+            continue
+        cur = df.loc[idx, col]
+        if pd.isna(cur):
+            cur = 0.0
+        df.loc[idx, col] = float(cur) + float(d)
+
+
 def recalculate_subtotals(df: pd.DataFrame) -> pd.DataFrame:
     """
-    重新计算所有小计和合计项
-    
-    这个函数需要根据资产负债表的具体结构来实现
-    目前先返回原DataFrame，后续需要实现完整的重新计算逻辑
+    重新计算所有小计和合计项（含级联更新父级合计）。
     
     Args:
         df: DataFrame
@@ -287,9 +332,6 @@ def recalculate_subtotals(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: 更新后的DataFrame
     """
-    # TODO: 实现完整的小计和合计重新计算逻辑
-    # 这需要知道每个小计/合计项包含哪些明细科目
-    
     # 获取所有重分类的科目
     reclassified_items = df[df['_reclassified_to'].notna()] if '_reclassified_to' in df.columns else pd.DataFrame()
     
@@ -299,50 +341,81 @@ def recalculate_subtotals(df: pd.DataFrame) -> pd.DataFrame:
     # 获取日期列
     date_columns = [col for col in df.columns if col != '项目' and not col.startswith('_')]
     
-    # 定义分类层级关系
-    category_structure = {
-        '金融资产合计': [],
-        '长期经营资产合计': [],
-        '营运资产小计': [],
-        '营运负债小计': [],
-        '周转性经营投入合计': ['营运资产小计', '营运负债小计'],
-        '经营资产合计': ['周转性经营投入合计', '长期经营资产合计'],
-        '短期债务': [],
-        '长期债务': [],
-        '有息债务合计': ['短期债务', '长期债务'],
-        '归属于母公司股东权益合计': [],
-        '少数股东权益': [],
-        '所有者权益合计': ['归属于母公司股东权益合计', '少数股东权益'],
-    }
-    
-    # 对于每个重分类的科目，更新相关的小计和合计
     for _, item_row in reclassified_items.iterrows():
-        item_name = item_row['项目']
         from_cat = item_row['_reclassified_from']
-        to_cat = item_row['_reclassified_to']
+        to_cat   = item_row['_reclassified_to']
         
-        # 从原分类中减去
-        from_idx = df[df['项目'] == from_cat].index
-        if len(from_idx) > 0:
-            for col in date_columns:
-                if pd.notna(item_row[col]) and pd.notna(df.loc[from_idx[0], col]):
-                    df.loc[from_idx[0], col] = float(df.loc[from_idx[0], col]) - float(item_row[col])
+        # 提取该行的数值 delta（重分类金额）
+        delta = pd.Series({col: item_row[col] for col in date_columns})
+        neg_delta = -delta
         
-        # 加到目标分类
-        to_idx = df[df['项目'] == to_cat].index
-        if len(to_idx) > 0:
-            for col in date_columns:
-                if pd.notna(item_row[col]):
-                    current_val = df.loc[to_idx[0], col]
-                    if pd.isna(current_val):
-                        current_val = 0
-                    df.loc[to_idx[0], col] = float(current_val) + float(item_row[col])
+        # ── 从原分类中减去（及其父级）
+        _update_row(df, from_cat, date_columns, neg_delta)
+        for parent in _CASCADE_PARENTS.get(from_cat, []):
+            _update_row(df, parent, date_columns, neg_delta)
+        
+        # ── 加到目标分类（及其父级）
+        _update_row(df, to_cat, date_columns, delta)
+        for parent in _CASCADE_PARENTS.get(to_cat, []):
+            _update_row(df, parent, date_columns, delta)
     
     # 清理临时标记列
     if '_reclassified_from' in df.columns:
         df = df.drop(columns=['_reclassified_from'])
     if '_reclassified_to' in df.columns:
         df = df.drop(columns=['_reclassified_to'])
+    
+    return df
+
+
+def reorder_reclassified_items(df: pd.DataFrame,
+                                reclassify_rules: dict) -> pd.DataFrame:
+    """
+    将被重分类的行物理移动到目标区段的末尾（紧接在锚点行之前）。
+    
+    Args:
+        df: recalculate_subtotals 已处理完毕的 DataFrame
+        reclassify_rules: 原始重分类规则字典 {item_name: {from, to, ...}}
+        
+    Returns:
+        行顺序调整后的 DataFrame
+    """
+    df = df.reset_index(drop=True)
+    
+    for item_name, rule in reclassify_rules.items():
+        to_cat = rule.get('to', '')
+        anchor = _SECTION_INSERT_BEFORE.get(to_cat)
+        if anchor is None:
+            continue
+        
+        # 找到 item 行和 anchor 行的当前位置
+        item_rows = df[df['项目'] == item_name]
+        anchor_rows = df[df['项目'] == anchor]
+        if len(item_rows) == 0 or len(anchor_rows) == 0:
+            continue
+        
+        item_pos  = item_rows.index[0]
+        anchor_pos = anchor_rows.index[0]
+        
+        if item_pos == anchor_pos - 1:
+            continue  # 已经在正确位置
+        
+        # 提取并删除 item 行
+        row_to_move = df.loc[[item_pos]].copy()
+        df = df.drop(index=item_pos).reset_index(drop=True)
+        
+        # 重新找 anchor 位置（删除后可能偏移）
+        anchor_rows_new = df[df['项目'] == anchor]
+        if len(anchor_rows_new) == 0:
+            continue
+        new_anchor_pos = anchor_rows_new.index[0]
+        
+        # 插入到 anchor 之前
+        df = pd.concat([
+            df.iloc[:new_anchor_pos],
+            row_to_move,
+            df.iloc[new_anchor_pos:]
+        ], ignore_index=True)
     
     return df
 
