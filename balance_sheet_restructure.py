@@ -42,6 +42,8 @@ UNIFIED_FIELD_MAPPING = {
     '持有待售资产': '持有待售资产',
     'nca_within_1y': '一年内到期的非流动资产',
     '一年内到期的非流动资产': '一年内到期的非流动资产',
+    'total_cur_assets': '流动资产合计',
+    '流动资产合计': '流动资产合计',
     
     # 非流动金融资产
     'loans_oth_bank': '发放贷款及垫款',
@@ -125,9 +127,9 @@ UNIFIED_FIELD_MAPPING = {
     '预计负债(非流动)': '预计负债(非流动)',
     'defer_reve_within_1y': '一年内到期的递延收益',
     '一年内到期的递延收益': '一年内到期的递延收益',
-    'defer_reve': '递延收益-非流动负债',
-    '递延收益-非流动负债': '递延收益-非流动负债',
-    '长期递延收益': '递延收益-非流动负债',
+    'defer_reve': '长期递延收益',
+    '递延收益-非流动负债': '长期递延收益',
+    '长期递延收益': '长期递延收益',
     'oth_ncl': '其他非流动负债',
     '其他非流动负债': '其他非流动负债',
     'div_payable': '应付股利',
@@ -262,6 +264,14 @@ FINANCIAL_ASSETS_FIELDS = [
     '可供出售金融资产', '持有至到期投资', '应收款项类投资'
 ]
 
+# 流动金融资产字段（用于计算发放贷款及垫款(流动)残差）
+# 仅包含属于流动资产的金融资产科目
+CURRENT_FINANCIAL_ASSETS_FIELDS = [
+    '货币资金', '拆出资金', '交易性金融资产', '衍生金融资产',
+    '应收利息', '应收股利', '买入返售金融资产', '持有待售资产',
+    '一年内到期的非流动资产',
+]
+
 # 长期股权投资字段列表
 LONG_TERM_EQUITY_FIELDS = [
     '长期股权投资',
@@ -284,7 +294,7 @@ OPERATING_LIABILITIES_FIELDS = [
     '其他应付款', '其他应付款合计', '其他流动负债', 
     '应付手续费及佣金', '应付分保账款', 
     '预计负债', '预计负债(流动)', '预计负债(非流动)',
-    '一年内到期的递延收益', '递延收益-非流动负债', '长期递延收益', '其他非流动负债',
+    '一年内到期的递延收益', '长期递延收益', '其他非流动负债',
 ]
 
 # 长期经营资产字段列表
@@ -435,21 +445,49 @@ def restructure_balance_sheet(df: pd.DataFrame, ts_code: Optional[str] = None) -
                     val = val.iloc[0]
                     
                 if field == '其他应收款':
-                    # 添加原始值和调整后值
+                    # 保留原始値，并以调整后値作为正式展示行项（与小计一致）
                     restructured_data['其他应收款(原值)'] = val
                     adjusted = _adjust_other_receivables(df_data, date_columns)
-                    restructured_data['其他应收款(调整后)'] = adjusted
+                    restructured_data['其他应收款'] = adjusted
                 else:
                     restructured_data[field] = val
             except:
                 pass
     
+    # 3.1b 计算发放贷款及垫款(流动) — 流动资产合计中未被命名字段覆盖的残差
+    # 残差 = 流动资产合计 - 已识别流动金融资产 - 已识别流动营运资产
+    # 适用于美的等拥有财务公司、Tushare未单独存储流动贷款字段的企业
+    if '流动资产合计' in df_data.index:
+        try:
+            cur_assets_total = df_data.loc['流动资产合计']
+            if isinstance(cur_assets_total, pd.DataFrame):
+                cur_assets_total = cur_assets_total.iloc[0]
+            cur_assets_total = pd.to_numeric(cur_assets_total, errors='coerce').fillna(0)
+
+            identified_cur_financial = _calculate_sum(df_data, CURRENT_FINANCIAL_ASSETS_FIELDS, date_columns)
+            # 流动营运资产 = 营运资产合计 - 长期应收款（非流动）
+            non_cur_op = _calculate_sum(df_data, ['长期应收款'], date_columns)
+            identified_cur_operating = operating_assets - non_cur_op
+
+            loans_current = (cur_assets_total - identified_cur_financial - identified_cur_operating).clip(lower=0)
+
+            if loans_current.sum() > 0:
+                restructured_data['发放贷款及垫款(流动)'] = loans_current
+                financial_assets = financial_assets + loans_current
+                restructured_data['金融资产合计'] = financial_assets
+                logger.info(f"计算出发放贷款及垫款(流动)，各期平均值: {loans_current.mean()/1e8:.2f}亿")
+        except Exception as e:
+            logger.warning(f"计算发放贷款及垫款(流动)时出错: {e}")
+
     # 3.2 营运负债小计
     operating_liabilities = _calculate_operating_liabilities(df_data, date_columns)
     restructured_data['营运负债小计'] = operating_liabilities
     
     # 添加营运负债明细
     for field in OPERATING_LIABILITIES_FIELDS:
+        if field in ['其他应付款', '其他应付款合计']:
+            continue  # 单独处理，使用调整后的值
+        
         if field in df_data.index:
             try:
                 val = df_data.loc[field]
@@ -458,6 +496,10 @@ def restructure_balance_sheet(df: pd.DataFrame, ts_code: Optional[str] = None) -
                 restructured_data[field] = val
             except:
                 pass
+    
+    # 添加调整后的其他应付款（扣除应付利息和应付股利）
+    other_payables_adjusted = _adjust_other_payables(df_data, date_columns)
+    restructured_data['其他应付款'] = other_payables_adjusted
     
     # 添加应付股利（单独列示）
     if '应付股利' in df_data.index:
@@ -535,7 +577,7 @@ def restructure_balance_sheet(df: pd.DataFrame, ts_code: Optional[str] = None) -
             val = df_data.loc['递延所得税负债']
             if isinstance(val, pd.DataFrame):
                 val = val.iloc[0]
-            restructured_data['递延所得税负债(减项)'] = val
+            restructured_data['递延所得税负债(减项)'] = -pd.to_numeric(val, errors='coerce').fillna(0)
         except:
             pass
     
@@ -596,13 +638,26 @@ def restructure_balance_sheet(df: pd.DataFrame, ts_code: Optional[str] = None) -
     restructured_data['归属于母公司股东权益合计'] = parent_equity
     
     # 添加股东权益明细
-    for field in EQUITY_POSITIVE_FIELDS + EQUITY_NEGATIVE_FIELDS:
+    for field in EQUITY_POSITIVE_FIELDS:
         if field in df_data.index:
             try:
                 val = df_data.loc[field]
                 if isinstance(val, pd.DataFrame):
                     val = val.iloc[0]
                 restructured_data[field] = val
+            except:
+                pass
+    
+    # 添加权益减项（存储为负值，使显示值与合计计算一致）
+    for field in EQUITY_NEGATIVE_FIELDS:
+        if field in df_data.index:
+            try:
+                val = df_data.loc[field]
+                if isinstance(val, pd.DataFrame):
+                    val = val.iloc[0]
+                # 转换为负值
+                val_numeric = pd.to_numeric(val, errors='coerce')
+                restructured_data[field] = -val_numeric
             except:
                 pass
     
@@ -631,38 +686,54 @@ def restructure_balance_sheet(df: pd.DataFrame, ts_code: Optional[str] = None) -
     # ========================================================================
     # 创建重构后的DataFrame
     # ========================================================================
-    
+
+    # 确定被重分类到金融资产的项目（用于动态调整输出顺序）
+    _items_reclassified_to_fa = []
+    if ts_code and RECLASSIFIER_AVAILABLE:
+        try:
+            from balance_sheet_reclassifier import load_company_rules as _load_rules
+            _rules = _load_rules(ts_code)
+            if _rules and 'reclassify' in _rules:
+                for _item, _rule in _rules['reclassify'].items():
+                    if _rule.get('to') == '金融资产合计':
+                        _items_reclassified_to_fa.append(_item)
+        except Exception:
+            pass
+
     # 定义输出顺序
     output_order = [
         # 资产结构
         '金融资产合计',
-        '货币资金', '交易性金融资产', '应收利息', '应收股利', 
+        '货币资金', '拆出资金', '交易性金融资产', '衍生金融资产',
+        '应收利息', '应收股利',
         '买入返售金融资产', '持有待售资产', '一年内到期的非流动资产',
-        '债权投资', '其他债权投资', '其他权益工具投资', 
+        '发放贷款及垫款(流动)', '发放贷款及垫款', '债权投资', '其他债权投资', '其他权益工具投资',
         '其他非流动金融资产', '投资性房地产',
+        # 重分类到FA的LTA项目会在下方动态插入到此处
         '长期股权投资',
         '经营资产合计',
         '周转性经营投入合计',
         '营运资产小计',
         '应收票据', '应收账款', '应收款项融资', '预付款项',
-        '其他应收款(原值)', '其他应收款(调整后)', '存货', '合同资产', 
+        '其他应收款', '存货', '合同资产',
         '长期应收款', '其他流动资产',
         '营运负债小计',
         '应付票据', '应付账款', '预收款项', '合同负债',
         '应付职工薪酬', '长期应付职工薪酬', '应交税费',
         '其他应付款', '应付股利', '应付手续费及佣金', '应付分保账款',
-        '其他流动负债', '预计负债(流动)', '预计负债(非流动)',
-        '一年内到期的递延收益', '递延收益-非流动负债',
+        '其他流动负债', '预计负债', '预计负债(流动)', '预计负债(非流动)',
+        '一年内到期的递延收益', '长期递延收益', '其他非流动负债',
         '长期经营资产合计',
         '固定资产', '在建工程合计', '生产性生物资产', '油气资产',
         '使用权资产', '无形资产', '开发支出', '商誉', '长期待摊费用',
         '其他非流动资产', '递延所得税资产', '递延所得税负债(减项)',
         '资产总额',
-        
+
         # 资本结构
         '有息债务合计',
         '短期债务',
-        '短期借款', '拆入资金', '交易性金融负债',
+        '短期借款', '拆入资金', '交易性金融负债', '衍生金融负债',
+        '卖出回购金融资产', '吸收存款及同业存放',
         '应付利息', '持有待售负债', '一年内到期的非流动负债',
         '长期债务',
         '长期借款', '应付债券', '租赁负债', '长期应付款',
@@ -677,6 +748,14 @@ def restructure_balance_sheet(df: pd.DataFrame, ts_code: Optional[str] = None) -
     # 创建DataFrame
     df_result = pd.DataFrame(restructured_data).T
     
+    # 动态调整：将重分类到FA的LTA项目，从长期经营资产区移至金融资产区
+    for _item in _items_reclassified_to_fa:
+        if _item in output_order:
+            output_order.remove(_item)
+            # 插入到 '长期股权投资' 行之前（金融资产区末尾）
+            _fa_end = output_order.index('长期股权投资')
+            output_order.insert(_fa_end, _item)
+
     # 按照预定义顺序排列
     available_items = [item for item in output_order if item in df_result.index]
     df_result = df_result.loc[available_items]

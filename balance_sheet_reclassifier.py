@@ -344,6 +344,32 @@ def recalculate_subtotals(df: pd.DataFrame) -> pd.DataFrame:
     if '_reclassified_to' in df.columns:
         df = df.drop(columns=['_reclassified_to'])
     
+    # 传播层级变化：重新计算经营资产合计 = 周转性经营投入合计 + 长期经营资产合计
+    wc_idx  = df[df['项目'] == '周转性经营投入合计'].index
+    lta_idx = df[df['项目'] == '长期经营资产合计'].index
+    oa_idx  = df[df['项目'] == '经营资产合计'].index
+    if len(wc_idx) > 0 and len(lta_idx) > 0 and len(oa_idx) > 0:
+        for col in date_columns:
+            wc_v  = df.loc[wc_idx[0],  col]
+            lta_v = df.loc[lta_idx[0], col]
+            if pd.notna(wc_v) or pd.notna(lta_v):
+                df.loc[oa_idx[0], col] = (float(wc_v)  if pd.notna(wc_v)  else 0.0) + \
+                                         (float(lta_v) if pd.notna(lta_v) else 0.0)
+    
+    # 重新计算资产总额 = 金融资产合计 + 长期股权投资 + 经营资产合计
+    fa_idx  = df[df['项目'] == '金融资产合计'].index
+    lte_idx = df[df['项目'] == '长期股权投资'].index
+    ta_idx  = df[df['项目'] == '资产总额'].index
+    if len(fa_idx) > 0 and len(lte_idx) > 0 and len(oa_idx) > 0 and len(ta_idx) > 0:
+        for col in date_columns:
+            fa_v  = df.loc[fa_idx[0],  col]
+            lte_v = df.loc[lte_idx[0], col]
+            oa_v  = df.loc[oa_idx[0],  col]
+            if pd.notna(fa_v) or pd.notna(lte_v) or pd.notna(oa_v):
+                df.loc[ta_idx[0], col] = (float(fa_v)  if pd.notna(fa_v)  else 0.0) + \
+                                         (float(lte_v) if pd.notna(lte_v) else 0.0) + \
+                                         (float(oa_v)  if pd.notna(oa_v)  else 0.0)
+    
     return df
 
 
