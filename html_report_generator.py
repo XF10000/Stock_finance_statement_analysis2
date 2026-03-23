@@ -254,6 +254,11 @@ class FinancialStatementsReportGenerator:
         """生成资产负债分析图表配置"""
         charts = []
         
+        # 加载公司特定重分类规则，用于过滤长期经营资产字段
+        from balance_sheet_reclassifier import load_company_rules
+        company_rules = load_company_rules(self.stock_code) if self.stock_code else {}
+        reclassify_rules = company_rules.get('reclassify', {})
+        
         # 图表1: 资产变化及类别组成比例
         chart1 = {
             'id': 'chart_assets_composition',
@@ -303,15 +308,29 @@ class FinancialStatementsReportGenerator:
         has_fixed_asset_total = '固定资产合计' in df['项目'].values if '项目' in df.columns else False
         fixed_asset_field = '固定资产合计' if has_fixed_asset_total else '固定资产'
         
+        # 定义长期经营资产的所有可能字段
+        lta_fields = [fixed_asset_field, '在建工程合计', '工程物资', '固定资产清理', 
+                     '生产性生物资产', '公益性生物资产', '油气资产', '使用权资产',
+                     '无形资产', '开发支出', '商誉', '长期待摊费用', 
+                     '其他非流动资产', '递延所得税资产', '递延所得税负债(减项)']
+        
+        # 根据重分类规则过滤字段：移除被重分类移出"长期经营资产合计"的字段
+        filtered_lta_fields = []
+        for field in lta_fields:
+            if field in reclassify_rules:
+                rule = reclassify_rules[field]
+                from_cat = rule.get('from', '')
+                # 如果该字段从"长期经营资产合计"移出，则不包含在图表中
+                if from_cat == '长期经营资产合计':
+                    continue
+            filtered_lta_fields.append(field)
+        
         chart3 = {
             'id': 'chart_long_term_assets',
             'title': '长期经营资产变化',
             'type': 'stacked_bar',
             'data': self._extract_chart_data(df, date_columns, {
-                'bar': [fixed_asset_field, '在建工程合计', '工程物资', '固定资产清理', 
-                       '生产性生物资产', '公益性生物资产', '油气资产', '使用权资产',
-                       '无形资产', '开发支出', '商誉', '长期待摊费用', 
-                       '其他非流动资产', '递延所得税资产', '递延所得税负债(减项)']
+                'bar': filtered_lta_fields
             }),
             'colors': {
                 '固定资产': '#E6E6FA',
