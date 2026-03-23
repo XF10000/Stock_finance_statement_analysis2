@@ -1638,7 +1638,11 @@ def main():
             finally:
                 updater.stop_batch_writer()
             if success:
-                logger.info(f"\n✓ {args.update_stock} 最新季度数据更新成功")
+                latest_in_db = updater.db_manager.get_latest_end_date(args.update_stock)
+                if latest_in_db:
+                    logger.info(f"\n✓ {args.update_stock} 更新完成，数据库中最新季度: {latest_in_db}")
+                else:
+                    logger.info(f"\n✓ {args.update_stock} 最新季度数据更新成功")
                 
                 # 计算核心指标（只计算目标季度，不重算全部历史）
                 if not args.no_indicators:

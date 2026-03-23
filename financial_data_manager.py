@@ -560,6 +560,26 @@ class FinancialDataManager:
             return pd.DataFrame(parsed_data)
         return pd.DataFrame()
     
+    def get_latest_end_date(self, ts_code: str, data_type: str = 'balancesheet') -> str:
+        """
+        查询某只股票在指定表中的最新报告期
+
+        Args:
+            ts_code: 股票代码
+            data_type: 数据类型（balancesheet / income / cashflow）
+
+        Returns:
+            最新报告期字符串，如 '20250930'，若无数据则返回 None
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(f'''
+            SELECT MAX(end_date) FROM {data_type}
+            WHERE ts_code = ?
+        ''', (ts_code,))
+        row = cursor.fetchone()
+        return row[0] if row and row[0] else None
+
     def check_data_exists(self, ts_code: str, end_date: str, data_type: str) -> bool:
         """
         检查数据是否已存在
