@@ -223,7 +223,7 @@ class FinancialStatementsReportGenerator:
                 'bar': ['销售费用', '管理费用', '研发费用', '税金及附加', 
                        '资产减值损失', '信用减值损失', '营业外收入', '营业外支出'],
                 'line': ['销售费用率', '管理费用率', '研发费用率', '税金及附加率',
-                        '经营资产减值损失率', '营业外收支净额率', '总费用率']
+                        '资产减值损失率', '营业外收支净额率', '总费用率']
             }),
             'colors': {
                 '销售费用': self.COLORS['orange'],
@@ -238,7 +238,7 @@ class FinancialStatementsReportGenerator:
                 '管理费用率': self.COLORS['yellow'],
                 '研发费用率': self.COLORS['green'],
                 '税金及附加率': self.COLORS['gray'],
-                '经营资产减值损失率': self.COLORS['blue'],
+                '资产减值损失率': self.COLORS['blue'],
                 '营业外收支净额率': self.COLORS['light_blue'],
                 '总费用率': '#7030A0'  # 紫色
             },
@@ -285,7 +285,7 @@ class FinancialStatementsReportGenerator:
             'type': 'stacked_bar_line',
             'data': self._extract_chart_data(df, date_columns, {
                 'bar': ['短期债务', '长期债务', '所有者权益合计'],
-                'line': ['有息债务率']
+                'line': ['有息债务合计', '资本总额']
             }),
             'colors': {
                 '短期债务': self.COLORS['blue'],
@@ -367,6 +367,7 @@ class FinancialStatementsReportGenerator:
             'colors': {
                 '周转性经营投入合计': self.COLORS['orange'],
                 '存货': self.COLORS['yellow'],
+                '营业收入': self.COLORS['blue'],
                 '经营资本-营业收入比例': self.COLORS['gray'],
                 '存货-营业收入比例': self.COLORS['yellow']
             },
@@ -1349,7 +1350,7 @@ class FinancialStatementsReportGenerator:
         ratio_fields = ['毛利率', '净利润率', '营业成本率', '销售费用率', '管理费用率', '研发费用率', 
                        '营业税金及附加率', '资产减值损失率', '有息债务率', 
                        '息前税后经营利润率', '息税前经营利润率', '自由现金流/营业收入', '营业费用率',
-                       '税金及附加率', '经营资产减值损失率', '营业外收支净额率', '总费用率']
+                       '税金及附加率', '营业外收支净额率', '总费用率']
         
         for chart_type, fields in series_config.items():
             for field in fields:
@@ -1704,6 +1705,14 @@ class FinancialStatementsReportGenerator:
                     'type': 'line',
                     'data': calc_data
                 }
+                
+                # 只删除不在颜色配置中的辅助字段（说明这些字段仅用于计算，不需要显示）
+                # 如果字段在颜色配置中，说明需要显示，不应删除
+                colors = chart_config.get('colors', {})
+                if numerator not in colors:
+                    del data['series'][numerator]
+                if denominator not in colors:
+                    del data['series'][denominator]
         
         # 构建series配置
         series_list = []
@@ -2261,12 +2270,16 @@ class FinancialStatementsReportGenerator:
                             year_q1q3_dividend_dict[year] = 0
                         year_q1q3_dividend_dict[year] += cash_div
             
-            # 读取总股本数据
-            balance_file = f'data/{self.stock_code}_balance_sheet_annual_ttm.csv'
+            # 读取总股本数据（优先读取最新的 Excel 文件）
+            import glob
+            balance_pattern = f'data/{self.stock_code}_balance_sheet_annual_ttm_*.xlsx'
+            balance_files = glob.glob(balance_pattern)
             total_share_dict = {}
             
-            if os.path.exists(balance_file):
-                balance_df = pd.read_csv(balance_file, encoding='utf-8-sig')
+            if balance_files:
+                # 使用最新的文件
+                balance_file = sorted(balance_files)[-1]
+                balance_df = pd.read_excel(balance_file)
                 # 确保列名是字符串类型
                 balance_df.columns = [str(col) for col in balance_df.columns]
                 

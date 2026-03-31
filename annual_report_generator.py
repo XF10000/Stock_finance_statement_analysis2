@@ -57,6 +57,16 @@ class AnnualReportGenerator:
         if latest_quarter == 4:
             start_year = latest_year - years
             end_year = latest_year
+            
+            # 检查利润表数据是否完整，给出警告信息
+            income_dates = [col for col in income_restructured.columns if col != '项目']
+            if latest_date in income_dates:
+                income_data = income_restructured[latest_date]
+                has_income_data = income_data.notna().any()
+                if not has_income_data:
+                    self.logger.warning(f"⚠️  {latest_year} 年报利润表数据尚未披露，相关图表将显示空值")
+            else:
+                self.logger.warning(f"⚠️  {latest_year} 年报利润表数据尚未披露，相关图表将显示空值")
         else:
             start_year = latest_year - years
             end_year = latest_year - 1
