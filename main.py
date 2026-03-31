@@ -314,7 +314,8 @@ def main():
                 # 生成年报+TTM数据
                 annual_reports = annual_generator.generate_annual_reports_with_ttm(
                     balance_restructured, income_restructured, cashflow_restructured, 
-                    years=years
+                    years=years,
+                    ts_code=ts_code
                 )
                 
                 # 保存年报+TTM报表（格式化Excel）
@@ -411,10 +412,27 @@ def main():
                 # 生成HTML报告
                 html_filename = os.path.join(args.output_dir, f"{ts_code}_financial_report_{timestamp}.html")
                 generator = FinancialStatementsReportGenerator(company_name=company_name, stock_code=ts_code)
-                generator.generate_report(
+                report_result = generator.generate_report(
                     balance_ttm, income_ttm, cashflow_ttm,
                     output_path=html_filename
                 )
+                
+                # 使用 HTML 报告生成器返回的图表数据生成 Excel 汇总
+                if report_result and 'charts_config' in report_result:
+                    print(f"\n生成财务指标汇总 Excel...")
+                    try:
+                        # 使用已导入的 AnnualReportGenerator（在文件开头已导入）
+                        excel_generator = AnnualReportGenerator()
+                        excel_generator._generate_summary_excel_from_charts(
+                            balance_ttm, income_ttm, cashflow_ttm,
+                            report_result['charts_config'],
+                            report_result['date_columns'],
+                            ts_code
+                        )
+                    except Exception as e:
+                        print(f"⚠️  生成 Excel 汇总失败: {e}")
+                        import traceback
+                        traceback.print_exc()
                 
                 print(f"\n提示: 在浏览器中打开该文件即可查看交互式财务分析报告")
             else:

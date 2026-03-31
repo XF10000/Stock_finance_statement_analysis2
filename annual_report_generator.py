@@ -21,7 +21,8 @@ class AnnualReportGenerator:
         balance_restructured: pd.DataFrame,
         income_restructured: pd.DataFrame,
         cashflow_restructured: pd.DataFrame,
-        years: int = 10
+        years: int = 10,
+        ts_code: str = None
     ) -> Dict[str, pd.DataFrame]:
         """
         生成年报+TTM的重构报表
@@ -89,6 +90,11 @@ class AnnualReportGenerator:
         # 生成现金流量表年报+TTM
         cashflow_annual_ttm = self._generate_cashflow_statement_annual_with_ttm(
             cashflow_restructured, annual_dates, latest_date, latest_quarter
+        )
+        
+        # 生成财务指标汇总 Excel
+        self._generate_summary_excel(
+            balance_annual_ttm, income_annual_ttm, cashflow_annual_ttm, ts_code
         )
         
         return {
@@ -520,6 +526,705 @@ class AnnualReportGenerator:
         df_formatted = df_formatted.rename(columns=new_columns)
         
         return df_formatted
+    
+    def _generate_summary_excel_from_charts(
+        self,
+        balance_data: pd.DataFrame,
+        income_data: pd.DataFrame,
+        cashflow_data: pd.DataFrame,
+        charts_config: list,
+        date_columns: list,
+        ts_code: str = None
+    ):
+        """
+        从 HTML 报告生成器返回的图表数据生成财务指标汇总 Excel 文件
+        
+        Args:
+            balance_data: 资产负债表年报+TTM数据
+            income_data: 利润表年报+TTM数据
+            cashflow_data: 现金流量表年报+TTM数据
+            charts_config: HTML 报告生成器返回的图表配置列表
+            date_columns: 日期列（从远到近）
+            ts_code: 股票代码
+        """
+        try:
+            # 日期列需要反转（从新到旧）
+            date_columns_reversed = list(reversed(date_columns))
+            
+            # 创建汇总数据字典
+            summary_data = {'指标': []}
+            
+            # 添加日期列
+            for date_col in date_columns_reversed:
+                summary_data[date_col] = []
+            
+            # 添加关键财务指标（保留原有的）
+            summary_data['指标'].append('')
+            for date_col in date_columns_reversed:
+                summary_data[date_col].append(None)
+            
+            summary_data['指标'].append('【关键财务指标】')
+            for date_col in date_columns_reversed:
+                summary_data[date_col].append(None)
+            
+            # 关键指标数据
+            key_indicators = [
+                ('营业收入', income_data, '营业收入'),
+                ('息税前经营利润', income_data, '息税前经营利润'),
+                ('(其中)利息费用', income_data, '(其中)利息费用'),
+                ('所有者权益合计', balance_data, '所有者权益合计'),
+                ('有息债务合计', balance_data, '有息债务合计'),
+                ('金融资产合计', balance_data, '金融资产合计'),
+                ('长期股权投资', balance_data, '长期股权投资'),
+                ('少数股东权益', balance_data, '少数股东权益'),
+                ('总股本', balance_data, '期末总股本'),
+                ('实际所得税税率', income_data, '实际所得税税率'),
+            ]
+            
+            for display_name, df, field_name in key_indicators:
+                summary_data['指标'].append(display_name)
+                field_row = df[df['项目'] == field_name]
+                if len(field_row) > 0:
+                    for date_col in date_columns_reversed:
+                        if date_col in df.columns:
+                            value = field_row[date_col].values[0]
+                            if pd.notna(value):
+                                summary_data[date_col].append(round(float(value), 2))
+                            else:
+                                summary_data[date_col].append(None)
+                        else:
+                            summary_data[date_col].append(None)
+                else:
+                    for date_col in date_columns_reversed:
+                        summary_data[date_col].append(None)
+            
+            # marginal sales/capital ratio
+            summary_data['指标'].append('marginal sales/capital ratio')
+            revenue_row = income_data[income_data['项目'] == '营业收入']
+            equity_row = balance_data[balance_data['项目'] == '所有者权益合计']
+            debt_row = balance_data[balance_data['项目'] == '有息债务合计']
+            financial_row = balance_data[balance_data['项目'] == '金融资产合计']
+            
+            for i, date_col in enumerate(date_columns_reversed):
+                if i == len(date_columns_reversed) - 1:
+                    summary_data[date_col].append(None)
+                else:
+                    prev_date_col = date_columns_reversed[i + 1]
+                    if (len(revenue_row) > 0 and len(equity_row) > 0 and len(debt_row) > 0 and len(financial_row) > 0):
+                        curr_revenue = revenue_row[date_col].values[0] if date_col in income_data.columns else None
+                        prev_revenue = revenue_row[prev_date_col].values[0] if prev_date_col in income_data.columns else None
+                        curr_equity = equity_row[date_col].values[0] if date_col in balance_data.columns else None
+                        curr_debt = debt_row[date_col].values[0] if date_col in balance_data.columns else None
+                        curr_financial = financial_row[date_col].values[0] if date_col in balance_data.columns else None
+                        prev_equity = equity_row[prev_date_col].values[0] if prev_date_col in balance_data.columns else None
+                        prev_debt = debt_row[prev_date_col].values[0] if prev_date_col in balance_data.columns else None
+                        prev_financial = financial_row[prev_date_col].values[0] if prev_date_col in balance_data.columns else None
+                        
+                        if all(pd.notna(x) for x in [curr_revenue, prev_revenue, curr_equity, curr_debt, curr_financial, prev_equity, prev_debt, prev_financial]):
+                            curr_capital = float(curr_equity) + float(curr_debt) - float(curr_financial)
+                            prev_capital = float(prev_equity) + float(prev_debt) - float(prev_financial)
+                            delta_revenue = float(curr_revenue) - float(prev_revenue)
+                            delta_capital = curr_capital - prev_capital
+                            if delta_capital != 0:
+                                summary_data[date_col].append(round(delta_revenue / delta_capital, 2))
+                            else:
+                                summary_data[date_col].append(None)
+                        else:
+                            summary_data[date_col].append(None)
+                    else:
+                        summary_data[date_col].append(None)
+            
+            # sales/capital ratio
+            summary_data['指标'].append('sales/capital ratio')
+            for date_col in date_columns_reversed:
+                if (len(revenue_row) > 0 and len(equity_row) > 0 and len(debt_row) > 0 and len(financial_row) > 0):
+                    revenue = revenue_row[date_col].values[0] if date_col in income_data.columns else None
+                    equity = equity_row[date_col].values[0] if date_col in balance_data.columns else None
+                    debt = debt_row[date_col].values[0] if date_col in balance_data.columns else None
+                    financial = financial_row[date_col].values[0] if date_col in balance_data.columns else None
+                    
+                    if all(pd.notna(x) for x in [revenue, equity, debt, financial]):
+                        capital = float(equity) + float(debt) - float(financial)
+                        if capital != 0:
+                            summary_data[date_col].append(round(float(revenue) / capital, 2))
+                        else:
+                            summary_data[date_col].append(None)
+                    else:
+                        summary_data[date_col].append(None)
+                else:
+                    summary_data[date_col].append(None)
+            
+            # 从图表数据中提取所有指标
+            for chart in charts_config:
+                # 添加空行
+                summary_data['指标'].append('')
+                for date_col in date_columns_reversed:
+                    summary_data[date_col].append(None)
+                
+                # 添加图表标题
+                chart_title = f"【{chart['title']}】"
+                summary_data['指标'].append(chart_title)
+                for date_col in date_columns_reversed:
+                    summary_data[date_col].append(None)
+                
+                # 添加图表中的每个数据系列
+                series = chart['data'].get('series', {})
+                for series_name, series_data in series.items():
+                    summary_data['指标'].append(series_name)
+                    data_values = series_data.get('data', [])
+                    # 注意：图表数据是从远到近，需要反转以匹配 date_columns_reversed（从新到旧）
+                    data_values_reversed = list(reversed(data_values))
+                    for i, date_col in enumerate(date_columns_reversed):
+                        if i < len(data_values_reversed):
+                            value = data_values_reversed[i]
+                            if value is not None:
+                                summary_data[date_col].append(round(float(value), 2))
+                            else:
+                                summary_data[date_col].append(None)
+                        else:
+                            summary_data[date_col].append(None)
+            
+            # 创建DataFrame
+            summary_df = pd.DataFrame(summary_data)
+            
+            # 将空字符串的指标行保留为空字符串（用于分隔不同类别）
+            summary_df['指标'] = summary_df['指标'].replace('', '---')
+            
+            # 重命名日期列，添加前缀避免 Excel 自动格式化为日期
+            # 例如：20251231 -> Y20251231
+            rename_dict = {}
+            for col in summary_df.columns:
+                if col != '指标' and isinstance(col, str) and col.isdigit() and len(col) == 8:
+                    rename_dict[col] = f"Y{col}"
+            if rename_dict:
+                summary_df = summary_df.rename(columns=rename_dict)
+            
+            # 生成Excel文件路径
+            import os
+            from datetime import datetime
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            excel_filename = f"data/{ts_code}_financial_summary_{timestamp}.xlsx"
+            
+            # 使用openpyxl直接写入，避免pandas自动格式化日期
+            import openpyxl
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side, numbers
+            
+            # 创建新工作簿
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            
+            # 写入表头（日期列保持原始字符串格式）
+            headers = ['指标'] + date_columns_reversed
+            for col_idx, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col_idx, value=header)
+                # 日期列设置为文本格式
+                if col_idx > 1:
+                    cell.number_format = numbers.FORMAT_TEXT
+            
+            # 写入数据
+            for row_idx, (_, row_data) in enumerate(summary_df.iterrows(), 2):
+                for col_idx, (col_name, value) in enumerate(row_data.items(), 1):
+                    cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                    # 日期列的所有单元格都设置为文本格式
+                    if col_idx > 1:
+                        cell.number_format = numbers.FORMAT_TEXT
+            
+            # 格式化表头
+            header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
+            header_font = Font(bold=True, color='FFFFFF', size=11)
+            
+            for cell in ws[1]:
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+            
+            # 定义边框样式
+            thin_border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+            
+            # 格式化数据行
+            for row_idx, row in enumerate(ws.iter_rows(min_row=2), start=2):
+                indicator_name = row[0].value
+                
+                # 空行（分隔符）：无边框，白色背景
+                if indicator_name == '---':
+                    for cell in row:
+                        cell.border = Border()
+                        cell.fill = PatternFill(fill_type=None)
+                    continue
+                
+                # 标题行：绿色背景，加粗，居中
+                if indicator_name and indicator_name.startswith('【') and indicator_name.endswith('】'):
+                    title_fill = PatternFill(start_color='92D050', end_color='92D050', fill_type='solid')
+                    title_font = Font(bold=True, size=11)
+                    for cell in row:
+                        cell.fill = title_fill
+                        cell.font = title_font
+                        cell.alignment = Alignment(horizontal='center', vertical='center')
+                        cell.border = thin_border
+                    continue
+                
+                # 普通数据行
+                # 指标名称列：加粗，左对齐
+                row[0].font = Font(bold=True)
+                row[0].alignment = Alignment(horizontal='left', vertical='center')
+                row[0].border = thin_border
+                
+                # 数值列：右对齐
+                for cell in row[1:]:
+                    cell.alignment = Alignment(horizontal='right', vertical='center')
+                    cell.border = thin_border
+                    
+                    value = cell.value
+                    
+                    # 根据指标类型格式化数值
+                    if value is not None and isinstance(value, (int, float)) and not isinstance(value, str):
+                        # 整数字段（不显示小数点）- 金额类
+                        integer_fields = [
+                            '营业收入', '息税前经营利润', '(其中)利息费用',
+                            '所有者权益合计', '有息债务合计', '金融资产合计',
+                            '长期股权投资', '少数股东权益', '总股本',
+                            '营业成本', '毛利', '净利润', '息前税后经营利润',
+                            '销售费用', '管理费用', '研发费用', '税金及附加', '资产减值损失',
+                            '经营资产合计', '周转性经营投入合计', '长期经营资产合计',
+                            '短期债务', '长期债务', '资本总额', '存货', '应收账款', '应付账款', '货币资金',
+                            '经营活动产生的现金流量净额', '投资活动产生的现金流净额', '资本支出总额',
+                            '经营资产自由现金流量', '债务筹资净额', '长期经营资产净投资额', '扩张性资本支出',
+                            '真实财务费用', '税前利润', '资本支出净额', '长期股权投资收益', '长期股权外投资收益',
+                            'FCFE', '分红'
+                        ]
+                        
+                        # 百分比字段（已经是百分比数值，如 15.5 表示 15.5%）
+                        percentage_fields = [
+                            '实际所得税税率', '营业成本率', '毛利率', '净利润率', '息税前经营利润率',
+                            '销售费用率', '管理费用率', '研发费用率', '营业税金及附加率', '资产减值损失率',
+                            '有息债务率', '财务成本负担率', '扩张性资本支出占长期资产期初净额的比例',
+                            '长期股权投资收益率', 'ROIC', 'ROE'
+                        ]
+                        
+                        # 比率字段（2位小数）
+                        ratio_fields = [
+                            'marginal sales/capital ratio', 'sales/capital ratio',
+                            '经营资产周转率', '长期经营资产周转率', '固定资产周转率',
+                            '应收账款周转率', '存货周转率', '应付账款周转率'
+                        ]
+                        
+                        # 天数字段（1位小数）
+                        days_fields = [
+                            '应收账款周转天数', '存货周转天数', '应付账款周转天数',
+                            '营业周期', '现金周期'
+                        ]
+                        
+                        if indicator_name in integer_fields:
+                            # 整数格式，带千分位分隔符
+                            cell.number_format = '#,##0'
+                        elif indicator_name in percentage_fields:
+                            # 百分比格式，1位小数（数值已经是百分比）
+                            cell.number_format = '0.0"%"'
+                        elif indicator_name in ratio_fields:
+                            # 比率格式，2位小数
+                            cell.number_format = '0.00'
+                        elif indicator_name in days_fields:
+                            # 天数格式，1位小数
+                            cell.number_format = '0.0'
+                        else:
+                            # 默认格式
+                            if abs(value) >= 1000:
+                                cell.number_format = '#,##0.00'
+                            else:
+                                cell.number_format = '0.00'
+            
+            # 调整列宽
+            ws.column_dimensions['A'].width = 30  # 指标列
+            for col_idx in range(2, len(date_columns_reversed) + 2):
+                col_letter = openpyxl.utils.get_column_letter(col_idx)
+                ws.column_dimensions[col_letter].width = 15
+            
+            # 冻结首行和首列
+            ws.freeze_panes = 'B2'
+            
+            # 保存
+            wb.save(excel_filename)
+            wb.close()
+            
+            print(f"✓ 财务指标汇总已导出到: {excel_filename}")
+            
+        except Exception as e:
+            print(f"生成财务指标汇总Excel失败: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _generate_summary_excel(
+        self,
+        balance_data: pd.DataFrame,
+        income_data: pd.DataFrame,
+        cashflow_data: pd.DataFrame,
+        ts_code: str = None
+    ):
+        """
+        生成财务指标汇总 Excel 文件（旧方法，保留用于向后兼容）
+        直接使用 HTML 报告生成器中已经计算好的图表数据
+        
+        Args:
+            balance_data: 资产负债表年报+TTM数据
+            income_data: 利润表年报+TTM数据
+            cashflow_data: 现金流量表年报+TTM数据
+            ts_code: 股票代码
+        """
+        try:
+            from html_report_generator import FinancialStatementsReportGenerator
+            
+            # 获取日期列（降序：从新到旧）
+            date_columns = [col for col in balance_data.columns if col != '项目']
+            
+            # 创建 HTML 报告生成器实例以获取图表数据
+            html_generator = FinancialStatementsReportGenerator(
+                company_name=self.company_name if hasattr(self, 'company_name') else "",
+                stock_code=ts_code if ts_code else ""
+            )
+            
+            # 生成所有图表配置（包含已计算的数据）
+            all_charts = []
+            
+            # 1. 利润分析图表
+            profit_charts = html_generator._generate_profit_charts(income_data, date_columns)
+            all_charts.extend(profit_charts)
+            
+            # 2. 资产负债表分析图表
+            balance_charts = html_generator._generate_balance_charts(balance_data, date_columns)
+            all_charts.extend(balance_charts)
+            
+            # 3. 经营效率分析图表
+            efficiency_charts = html_generator._generate_efficiency_charts(balance_data, income_data, date_columns)
+            # 为效率图表添加计算字段
+            for chart in efficiency_charts:
+                if chart.get('needs_roe_roic_calc'):
+                    html_generator._add_roe_roic_calculations(chart, balance_data, income_data, date_columns)
+                elif chart.get('needs_asset_efficiency_calc'):
+                    html_generator._add_asset_efficiency_calculations(chart, balance_data, income_data, date_columns)
+                elif chart.get('needs_turnover_days_calc'):
+                    html_generator._add_turnover_days_calculations(chart, balance_data, income_data, date_columns)
+                elif chart.get('needs_turnover_ratio_calc'):
+                    html_generator._add_turnover_ratio_calculations(chart, balance_data, income_data, date_columns)
+            all_charts.extend(efficiency_charts)
+            
+            # 4. 财务成本分析图表
+            finance_cost_charts = html_generator._generate_finance_cost_charts(income_data, date_columns)
+            for chart in finance_cost_charts:
+                if chart.get('needs_finance_cost_calc'):
+                    html_generator._add_finance_cost_calculations(chart, income_data, date_columns)
+            all_charts.extend(finance_cost_charts)
+            
+            # 5. 长期资产投资和并购活动分析图表
+            capex_charts = html_generator._generate_capex_charts(balance_data, cashflow_data, date_columns)
+            for chart in capex_charts:
+                if chart.get('needs_capex_calc'):
+                    html_generator._add_capex_calculations(chart, balance_data, cashflow_data, date_columns)
+            all_charts.extend(capex_charts)
+            
+            # 6. 投资收益分析图表
+            investment_charts = html_generator._generate_investment_income_charts(balance_data, income_data, date_columns)
+            for chart in investment_charts:
+                if chart.get('needs_investment_income_calc'):
+                    html_generator._add_investment_income_calculations(chart, balance_data, income_data, date_columns)
+            all_charts.extend(investment_charts)
+            
+            # 7. 现金流分析图表
+            cashflow_charts = html_generator._generate_cashflow_charts(cashflow_data, date_columns)
+            all_charts.extend(cashflow_charts)
+            
+            # 8. FCFE vs Dividend 图表
+            fcfe_chart = html_generator._generate_fcfe_dividend_chart(balance_data, income_data, cashflow_data, date_columns)
+            all_charts.append(fcfe_chart)
+            
+            # 创建汇总数据字典
+            summary_data = {'指标': []}
+            
+            # 添加日期列
+            for date_col in date_columns:
+                summary_data[date_col] = []
+            
+            # 添加关键财务指标（保留原有的）
+            summary_data['指标'].append('')
+            for date_col in date_columns:
+                summary_data[date_col].append(None)
+            
+            summary_data['指标'].append('【关键财务指标】')
+            for date_col in date_columns:
+                summary_data[date_col].append(None)
+            
+            # 关键指标数据
+            key_indicators = [
+                ('营业收入', income_data, '营业收入'),
+                ('息税前经营利润', income_data, '息税前经营利润'),
+                ('(其中)利息费用', income_data, '(其中)利息费用'),
+                ('所有者权益合计', balance_data, '所有者权益合计'),
+                ('有息债务合计', balance_data, '有息债务合计'),
+                ('金融资产合计', balance_data, '金融资产合计'),
+                ('长期股权投资', balance_data, '长期股权投资'),
+                ('少数股东权益', balance_data, '少数股东权益'),
+                ('总股本', balance_data, '期末总股本'),
+                ('实际所得税税率', income_data, '实际所得税税率'),
+            ]
+            
+            for display_name, df, field_name in key_indicators:
+                summary_data['指标'].append(display_name)
+                field_row = df[df['项目'] == field_name]
+                if len(field_row) > 0:
+                    for date_col in date_columns:
+                        if date_col in df.columns:
+                            value = field_row[date_col].values[0]
+                            if pd.notna(value):
+                                summary_data[date_col].append(round(float(value), 2))
+                            else:
+                                summary_data[date_col].append(None)
+                        else:
+                            summary_data[date_col].append(None)
+                else:
+                    for date_col in date_columns:
+                        summary_data[date_col].append(None)
+            
+            # marginal sales/capital ratio
+            summary_data['指标'].append('marginal sales/capital ratio')
+            revenue_row = income_data[income_data['项目'] == '营业收入']
+            equity_row = balance_data[balance_data['项目'] == '所有者权益合计']
+            debt_row = balance_data[balance_data['项目'] == '有息债务合计']
+            financial_row = balance_data[balance_data['项目'] == '金融资产合计']
+            
+            for i, date_col in enumerate(date_columns):
+                if i == len(date_columns) - 1:
+                    summary_data[date_col].append(None)
+                else:
+                    prev_date_col = date_columns[i + 1]
+                    if (len(revenue_row) > 0 and len(equity_row) > 0 and len(debt_row) > 0 and len(financial_row) > 0):
+                        curr_revenue = revenue_row[date_col].values[0] if date_col in income_data.columns else None
+                        prev_revenue = revenue_row[prev_date_col].values[0] if prev_date_col in income_data.columns else None
+                        curr_equity = equity_row[date_col].values[0] if date_col in balance_data.columns else None
+                        curr_debt = debt_row[date_col].values[0] if date_col in balance_data.columns else None
+                        curr_financial = financial_row[date_col].values[0] if date_col in balance_data.columns else None
+                        prev_equity = equity_row[prev_date_col].values[0] if prev_date_col in balance_data.columns else None
+                        prev_debt = debt_row[prev_date_col].values[0] if prev_date_col in balance_data.columns else None
+                        prev_financial = financial_row[prev_date_col].values[0] if prev_date_col in balance_data.columns else None
+                        
+                        if all(pd.notna(x) for x in [curr_revenue, prev_revenue, curr_equity, curr_debt, curr_financial, prev_equity, prev_debt, prev_financial]):
+                            curr_capital = float(curr_equity) + float(curr_debt) - float(curr_financial)
+                            prev_capital = float(prev_equity) + float(prev_debt) - float(prev_financial)
+                            delta_revenue = float(curr_revenue) - float(prev_revenue)
+                            delta_capital = curr_capital - prev_capital
+                            if delta_capital != 0:
+                                summary_data[date_col].append(round(delta_revenue / delta_capital, 2))
+                            else:
+                                summary_data[date_col].append(None)
+                        else:
+                            summary_data[date_col].append(None)
+                    else:
+                        summary_data[date_col].append(None)
+            
+            # sales/capital ratio
+            summary_data['指标'].append('sales/capital ratio')
+            for date_col in date_columns:
+                if (len(revenue_row) > 0 and len(equity_row) > 0 and len(debt_row) > 0 and len(financial_row) > 0):
+                    revenue = revenue_row[date_col].values[0] if date_col in income_data.columns else None
+                    equity = equity_row[date_col].values[0] if date_col in balance_data.columns else None
+                    debt = debt_row[date_col].values[0] if date_col in balance_data.columns else None
+                    financial = financial_row[date_col].values[0] if date_col in balance_data.columns else None
+                    
+                    if all(pd.notna(x) for x in [revenue, equity, debt, financial]):
+                        capital = float(equity) + float(debt) - float(financial)
+                        if capital != 0:
+                            summary_data[date_col].append(round(float(revenue) / capital, 2))
+                        else:
+                            summary_data[date_col].append(None)
+                    else:
+                        summary_data[date_col].append(None)
+                else:
+                    summary_data[date_col].append(None)
+            
+            # 从图表数据中提取所有指标
+            for chart in all_charts:
+                # 添加空行
+                summary_data['指标'].append('')
+                for date_col in date_columns:
+                    summary_data[date_col].append(None)
+                
+                # 添加图表标题
+                chart_title = f"【{chart['title']}】"
+                summary_data['指标'].append(chart_title)
+                for date_col in date_columns:
+                    summary_data[date_col].append(None)
+                
+                # 添加图表中的每个数据系列
+                series = chart['data'].get('series', {})
+                for series_name, series_data in series.items():
+                    summary_data['指标'].append(series_name)
+                    data_values = series_data.get('data', [])
+                    for i, date_col in enumerate(date_columns):
+                        if i < len(data_values):
+                            value = data_values[i]
+                            if value is not None:
+                                summary_data[date_col].append(round(float(value), 2))
+                            else:
+                                summary_data[date_col].append(None)
+                        else:
+                            summary_data[date_col].append(None)
+            
+            
+            # 创建DataFrame
+            summary_df = pd.DataFrame(summary_data)
+            
+            # 将空字符串的指标行保留为空字符串（用于分隔不同类别）
+            summary_df['指标'] = summary_df['指标'].replace('', '---')
+            
+            # 生成Excel文件路径
+            import os
+            from datetime import datetime
+            
+            # 生成时间戳
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            
+            # 使用传入的股票代码或默认文件名
+            if ts_code:
+                excel_path = f'data/{ts_code}_financial_summary_{timestamp}.xlsx'
+            else:
+                excel_path = f'data/financial_summary_{timestamp}.xlsx'
+            
+            # 导出到Excel并美化格式
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            from openpyxl.utils.dataframe import dataframe_to_rows
+            
+            # 创建工作簿
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "财务指标汇总"
+            
+            # 写入数据
+            for r_idx, row in enumerate(dataframe_to_rows(summary_df, index=False, header=True), 1):
+                for c_idx, value in enumerate(row, 1):
+                    cell = ws.cell(row=r_idx, column=c_idx, value=value)
+                    
+                    # 设置边框
+                    thin_border = Border(
+                        left=Side(style='thin'),
+                        right=Side(style='thin'),
+                        top=Side(style='thin'),
+                        bottom=Side(style='thin')
+                    )
+                    cell.border = thin_border
+                    
+                    # 表头样式
+                    if r_idx == 1:
+                        cell.font = Font(bold=True, size=11, color="FFFFFF")
+                        cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+                        cell.alignment = Alignment(horizontal='center', vertical='center')
+                    else:
+                        # 获取当前行的指标名称
+                        indicator_name = ws.cell(r_idx, 1).value
+                        
+                        # 图表标题行样式（以【】包围的）
+                        if indicator_name and indicator_name.startswith('【') and indicator_name.endswith('】'):
+                            if c_idx == 1:
+                                cell.font = Font(bold=True, size=12, color="FFFFFF")
+                                cell.fill = PatternFill(start_color="70AD47", end_color="70AD47", fill_type="solid")
+                                cell.alignment = Alignment(horizontal='center', vertical='center')
+                            else:
+                                cell.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+                                cell.alignment = Alignment(horizontal='center', vertical='center')
+                        
+                        # 空行样式（指标名为 '---' 的）
+                        elif indicator_name == '---':
+                            # 空行不显示边框
+                            cell.border = Border()
+                            cell.fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+                        
+                        # 数据行样式
+                        else:
+                            if c_idx == 1:
+                                # 指标列左对齐
+                                cell.alignment = Alignment(horizontal='left', vertical='center')
+                                cell.font = Font(bold=True, size=10)
+                            else:
+                                # 数值列右对齐
+                                cell.alignment = Alignment(horizontal='right', vertical='center')
+                                
+                                # 根据指标类型格式化数值
+                                if value is not None and isinstance(value, (int, float)) and not isinstance(value, str):
+                                    # 整数字段（不显示小数点）- 金额类
+                                    integer_fields = [
+                                        '营业收入', '息税前经营利润', '(其中)利息费用',
+                                        '所有者权益合计', '有息债务合计', '金融资产合计',
+                                        '长期股权投资', '少数股东权益', '总股本',
+                                        '营业成本', '毛利', '净利润', '息前税后经营利润',
+                                        '销售费用', '管理费用', '研发费用', '税金及附加', '资产减值损失',
+                                        '经营资产合计', '周转性经营投入合计', '长期经营资产合计',
+                                        '短期债务', '长期债务', '资本总额', '存货', '应收账款', '应付账款', '货币资金',
+                                        '经营活动产生的现金流量净额', '投资活动产生的现金流净额', '资本支出总额',
+                                        '经营资产自由现金流量', '债务筹资净额', '长期经营资产净投资额', '扩张性资本支出',
+                                        '真实财务费用', '税前利润', '资本支出净额', '长期股权投资收益', '长期股权外投资收益',
+                                        'FCFE', '分红'
+                                    ]
+                                    
+                                    # 百分比字段（已经是百分比数值，如 15.5 表示 15.5%）
+                                    percentage_fields = [
+                                        '实际所得税税率', '营业成本率', '毛利率', '净利润率', '息税前经营利润率',
+                                        '销售费用率', '管理费用率', '研发费用率', '营业税金及附加率', '资产减值损失率',
+                                        '有息债务率', '财务成本负担率', '扩张性资本支出占长期资产期初净额的比例',
+                                        '长期股权投资收益率', 'ROIC', 'ROE'
+                                    ]
+                                    
+                                    # 比率字段（2位小数）
+                                    ratio_fields = [
+                                        'marginal sales/capital ratio', 'sales/capital ratio',
+                                        '经营资产周转率', '长期经营资产周转率', '固定资产周转率',
+                                        '应收账款周转率', '存货周转率', '应付账款周转率'
+                                    ]
+                                    
+                                    # 天数字段（1位小数）
+                                    days_fields = [
+                                        '应收账款周转天数', '存货周转天数', '应付账款周转天数',
+                                        '营业周期', '现金周期'
+                                    ]
+                                    
+                                    if indicator_name in integer_fields:
+                                        # 整数格式，带千分位分隔符
+                                        cell.number_format = '#,##0'
+                                    elif indicator_name in percentage_fields:
+                                        # 百分比格式，1位小数（数值已经是百分比）
+                                        cell.number_format = '0.0"%"'
+                                    elif indicator_name in ratio_fields:
+                                        # 比率格式，2位小数
+                                        cell.number_format = '0.00'
+                                    elif indicator_name in days_fields:
+                                        # 天数格式，1位小数
+                                        cell.number_format = '0.0'
+                                    else:
+                                        # 默认格式
+                                        if abs(value) >= 1000:
+                                            cell.number_format = '#,##0.00'
+                                        else:
+                                            cell.number_format = '0.00'
+            
+            # 调整列宽
+            ws.column_dimensions['A'].width = 30  # 指标列
+            for col_idx in range(2, len(date_columns) + 2):
+                ws.column_dimensions[ws.cell(1, col_idx).column_letter].width = 15
+            
+            # 冻结首行和首列
+            ws.freeze_panes = 'B2'
+            
+            # 保存文件
+            wb.save(excel_path)
+            
+            print(f"✓ 财务指标汇总已导出到: {excel_path}")
+            
+        except Exception as e:
+            self.logger.error(f"生成财务指标汇总Excel失败: {e}")
+            import traceback
+            traceback.print_exc()
 
 
 # ============================================================================

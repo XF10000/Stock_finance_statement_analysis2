@@ -164,7 +164,13 @@ class FinancialStatementsReportGenerator:
             f.write(html_content)
         
         print(f"✓ HTML报告已生成: {output_path}")
-        return output_path
+        
+        # 返回文件路径和图表配置数据（用于生成 Excel）
+        return {
+            'html_path': output_path,
+            'charts_config': charts_config,
+            'date_columns': date_columns
+        }
     
     def _generate_profit_charts(self, df: pd.DataFrame, date_columns: List[str]) -> List[Dict]:
         """生成利润分析图表配置"""
@@ -220,9 +226,9 @@ class FinancialStatementsReportGenerator:
             'title': '营业费用',
             'type': 'bar_line',
             'data': self._extract_chart_data(df, date_columns, {
-                'bar': ['销售费用', '管理费用', '研发费用', '税金及附加', 
-                       '资产减值损失', '信用减值损失', '营业外收入', '营业外支出'],
-                'line': ['销售费用率', '管理费用率', '研发费用率', '税金及附加率',
+                'bar': ['营业收入', '销售费用', '管理费用', '研发费用', '税金及附加', 
+                       '资产减值损失', '信用减值损失', '加：营业外收入', '减：营业外支出'],
+                'line': ['销售费用率', '管理费用率', '研发费用率', '营业税金及附加率',
                         '资产减值损失率', '营业外收支净额率', '总费用率']
             }),
             'colors': {
@@ -529,11 +535,12 @@ class FinancialStatementsReportGenerator:
         税金及附加 = series.get('税金及附加', {}).get('data', [])
         资产减值损失 = series.get('资产减值损失', {}).get('data', [])
         信用减值损失 = series.get('信用减值损失', {}).get('data', [])
-        营业外收入 = series.get('营业外收入', {}).get('data', [])
-        营业外支出 = series.get('营业外支出', {}).get('data', [])
+        营业外收入 = series.get('加：营业外收入', {}).get('data', [])
+        营业外支出 = series.get('减：营业外支出', {}).get('data', [])
         销售费用率 = series.get('销售费用率', {}).get('data', [])
         管理费用率 = series.get('管理费用率', {}).get('data', [])
         研发费用率 = series.get('研发费用率', {}).get('data', [])
+        营业税金及附加率 = series.get('营业税金及附加率', {}).get('data', [])
         
         # 计算新字段
         税金及附加率_data = []
@@ -543,12 +550,9 @@ class FinancialStatementsReportGenerator:
         总费用率_data = []
         
         for i in range(len(date_columns)):
-            # 1. 税金及附加率 = 税金及附加 / 营业收入
-            if 税金及附加 and 营业收入 and i < len(税金及附加) and i < len(营业收入):
-                if 税金及附加[i] is not None and 营业收入[i] is not None and 营业收入[i] != 0:
-                    税金及附加率_data.append((税金及附加[i] / 营业收入[i]) * 100)
-                else:
-                    税金及附加率_data.append(None)
+            # 1. 税金及附加率：直接使用利润表中的营业税金及附加率
+            if 营业税金及附加率 and i < len(营业税金及附加率):
+                税金及附加率_data.append(营业税金及附加率[i])
             else:
                 税金及附加率_data.append(None)
             
