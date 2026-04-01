@@ -100,7 +100,7 @@ def main():
     parser.add_argument('--output-dir', type=str, default='./data', help='数据输出目录')
     parser.add_argument('--format', type=str, choices=['csv', 'excel', 'both'], 
                        default='csv', help='输出格式（csv/excel/both）')
-    parser.add_argument('--db-path', type=str, default='database/financial_data.db', 
+    parser.add_argument('--db-path', type=str, default='database/All-A-Stock_financial_data.db', 
                        help='数据库路径')
     parser.add_argument('--annual-ttm', action='store_true', default=True,
                        help='生成年报+TTM重构报表（默认开启，使用--no-annual-ttm关闭）')

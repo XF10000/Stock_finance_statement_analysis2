@@ -18,7 +18,7 @@ from io import StringIO
 class FinancialDataManager:
     """财务数据管理器 - 管理全A股财务数据的SQLite数据库"""
     
-    def __init__(self, db_path: str = 'database/financial_data.db'):
+    def __init__(self, db_path: str = 'database/All-A-Stock_financial_data.db'):
         """
         初始化数据库管理器
         

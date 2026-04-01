@@ -246,7 +246,7 @@ if __name__ == '__main__':
     
     logging.basicConfig(level=logging.INFO)
     
-    db = FinancialDataManager('database/financial_data.db')
+    db = FinancialDataManager('database/All-A-Stock_financial_data.db')
     generator = TTMGenerator()
     
     # 测试 000680 的 2024Q3 TTM

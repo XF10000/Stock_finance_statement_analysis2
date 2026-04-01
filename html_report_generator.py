@@ -2228,7 +2228,7 @@ class FinancialStatementsReportGenerator:
         
         try:
             # 从数据库读取分红数据
-            db_manager = FinancialDataManager('database/financial_data.db')
+            db_manager = FinancialDataManager('database/All-A-Stock_financial_data.db')
             df = db_manager.get_dividend_data(self.stock_code)
             
             if df is None or len(df) == 0:

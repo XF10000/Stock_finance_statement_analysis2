@@ -1521,8 +1521,8 @@ def main():
                        help='并发线程数（默认：5，建议范围：2-8）')
     parser.add_argument('--config', type=str, default='config.yaml',
                        help='配置文件路径（默认：config.yaml）')
-    parser.add_argument('--db', type=str, default='database/financial_data.db',
-                       help='数据库文件路径（默认：database/financial_data.db）')
+    parser.add_argument('--db-path', type=str, default='database/All-A-Stock_financial_data.db',
+                       help='数据库文件路径（默认：database/All-A-Stock_financial_data.db）')
     parser.add_argument('--log-level', type=str, default='INFO',
                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                        help='日志级别（默认：INFO）')

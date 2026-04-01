@@ -59,7 +59,7 @@ def main():
     # 初始化更新器（单线程）
     updater = FinancialDataUpdater(
         config_path='config.yaml',
-        db_path='database/financial_data.db',
+        db_path='database/All-A-Stock_financial_data.db',
         max_workers=1  # 单线程
     )
     

@@ -15,7 +15,7 @@ from financial_data_analyzer import FinancialDataAnalyzer
 class CoreIndicatorsReportGenerator:
     """核心指标报告生成器（ECharts版本）"""
     
-    def __init__(self, db_path: str = 'database/financial_data.db'):
+    def __init__(self, db_path: str = 'database/All-A-Stock_financial_data.db'):
         self.db = FinancialDataManager(db_path)
         self.analyzer = CoreIndicatorsAnalyzer()
         self.market_analyzer = FinancialDataAnalyzer(self.db)
