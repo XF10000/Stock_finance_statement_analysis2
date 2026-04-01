@@ -1559,7 +1559,7 @@ def main():
     # 初始化更新器
     updater = FinancialDataUpdater(
         config_path=args.config,
-        db_path=args.db,
+        db_path=args.db_path,
         max_workers=args.workers
     )
     
