@@ -563,7 +563,7 @@ class AnnualReportGenerator:
             for date_col in date_columns_reversed:
                 summary_data[date_col].append(None)
             
-            summary_data['指标'].append('【关键财务指标】')
+            summary_data['指标'].append('【关键财务指标】（单位：元、%）')
             for date_col in date_columns_reversed:
                 summary_data[date_col].append(None)
             
@@ -662,7 +662,7 @@ class AnnualReportGenerator:
                     summary_data[date_col].append(None)
                 
                 # 添加图表标题
-                chart_title = f"【{chart['title']}】"
+                chart_title = f"【{chart['title']}】（单位：亿元、%）"
                 summary_data['指标'].append(chart_title)
                 for date_col in date_columns_reversed:
                     summary_data[date_col].append(None)
