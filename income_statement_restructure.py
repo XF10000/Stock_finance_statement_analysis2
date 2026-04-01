@@ -419,14 +419,15 @@ def restructure_income_statement(df: pd.DataFrame,
     restructured_data['减：所得税费用'] = income_tax
     
     # 重新计算实际所得税税率（使用重构后的税前利润）
-    # 实际所得税税率 = 所得税费用 / (税前利润 - 长期股权投资收益)
+    # 实际所得税税率 = 所得税费用 / (税前利润 - 长期股权投资收益) * 100
     taxable_profit_recalc = profit_before_tax_calc - long_term_equity_income
     effective_tax_rate_recalc = income_tax / taxable_profit_recalc.replace(0, np.nan)
-    effective_tax_rate_recalc = effective_tax_rate_recalc.clip(lower=0, upper=1)
+    effective_tax_rate_recalc = effective_tax_rate_recalc.clip(lower=0, upper=1) * 100  # 转换为百分比数值
     restructured_data['实际所得税税率'] = effective_tax_rate_recalc
     
     # 重新计算经营利润所得税和息前税后经营利润（使用正确的实际所得税税率）
-    operating_tax_recalc = ebit_operating * effective_tax_rate_recalc
+    # 注意：effective_tax_rate_recalc 现在是百分比数值，需要除以100
+    operating_tax_recalc = ebit_operating * (effective_tax_rate_recalc / 100)
     restructured_data['经营利润所得税'] = operating_tax_recalc
     
     nopat_operating_recalc = ebit_operating - operating_tax_recalc

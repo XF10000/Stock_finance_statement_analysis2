@@ -1985,7 +1985,8 @@ class FinancialStatementsReportGenerator:
             tax_rate = 实际所得税税率_row[col].values[0] if len(实际所得税税率_row) > 0 else 0
             
             if pd.notna(ebit) and pd.notna(tax_rate):
-                ebit_after_tax = float(ebit) * (1 - float(tax_rate))
+                # tax_rate 现在是百分比数值（20表示20%），需要除以100
+                ebit_after_tax = float(ebit) * (1 - float(tax_rate) / 100)
                 息税前经营利润税后_data.append(round(ebit_after_tax / 1e8, 0))
             else:
                 ebit_after_tax = 0
