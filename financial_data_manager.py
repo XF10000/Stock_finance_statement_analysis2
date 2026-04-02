@@ -603,6 +603,29 @@ class FinancialDataManager:
         count = cursor.fetchone()[0]
         return count > 0
     
+    def check_data_completeness(self, ts_code: str) -> Dict[str, int]:
+        """
+        检查股票数据完整性
+        
+        Args:
+            ts_code: 股票代码
+            
+        Returns:
+            包含三张表记录数的字典
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        result = {}
+        for table in ['balancesheet', 'income', 'cashflow']:
+            cursor.execute(f'''
+                SELECT COUNT(*) FROM {table}
+                WHERE ts_code = ?
+            ''', (ts_code,))
+            result[table] = cursor.fetchone()[0]
+        
+        return result
+    
     # ========================================================================
     # 核心指标管理
     # ========================================================================
