@@ -1625,6 +1625,23 @@ def main():
                         logger.info("✓ TTM 核心指标计算完成")
                     except Exception as e:
                         logger.error(f"计算 TTM 核心指标失败: {e}")
+                
+                # 检查数据完整性
+                logger.info(f"\n检查 {args.update_stock} 数据完整性...")
+                data_check = updater.db_manager.check_data_completeness(args.update_stock)
+                missing_tables = []
+                if data_check['balancesheet'] == 0:
+                    missing_tables.append('资产负债表')
+                if data_check['income'] == 0:
+                    missing_tables.append('利润表')
+                if data_check['cashflow'] == 0:
+                    missing_tables.append('现金流量表')
+                
+                if missing_tables:
+                    logger.warning(f"⚠️  数据不完整：缺少 {', '.join(missing_tables)}")
+                    logger.warning(f"   可能是该股票尚未披露相关财务数据")
+                else:
+                    logger.info(f"✓ 数据完整性检查通过")
             else:
                 logger.error(f"\n✗ {args.update_stock} 完整历史数据更新失败")
         else:
@@ -1676,6 +1693,23 @@ def main():
                             logger.info("✓ 无新的分红数据需要更新")
                     except Exception as e:
                         logger.warning(f"更新分红数据失败: {e}")
+                    
+                    # 检查数据完整性
+                    logger.info(f"\n检查 {args.update_stock} 数据完整性...")
+                    data_check = updater.db_manager.check_data_completeness(args.update_stock)
+                    missing_tables = []
+                    if data_check['balancesheet'] == 0:
+                        missing_tables.append('资产负债表')
+                    if data_check['income'] == 0:
+                        missing_tables.append('利润表')
+                    if data_check['cashflow'] == 0:
+                        missing_tables.append('现金流量表')
+                    
+                    if missing_tables:
+                        logger.warning(f"⚠️  数据不完整：缺少 {', '.join(missing_tables)}")
+                        logger.warning(f"   建议使用 --full 参数重新获取完整历史数据")
+                    else:
+                        logger.info(f"✓ 数据完整性检查通过")
             else:
                 logger.error(f"\n✗ {args.update_stock} 最新季度数据更新失败")
         
