@@ -1825,7 +1825,9 @@ class FinancialStatementsReportGenerator:
                             if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {{
                                 formattedValue = value != null ? value.toFixed(1) + '%' : '-';
                             }} else {{
-                                formattedValue = value != null ? {f"value.toFixed(1) + '{value_unit}'" if value_unit else "value.toFixed(0)"} : '-';
+                                // 使用bar_format决定小数位数
+                                var decimals = {1 if bar_format == 'decimal' else 1};
+                                formattedValue = value != null ? value.toFixed(decimals){f" + '{value_unit}'" if value_unit else ""} : '-';
                             }}
                             result += item.marker + ' ' + item.seriesName + ': ' + formattedValue + '<br/>';
                         }});
@@ -1973,26 +1975,25 @@ class FinancialStatementsReportGenerator:
         周转性经营投入_row = balance_df[balance_df['项目'] == '周转性经营投入合计']
         
         # 计算各项指标
-        息税前经营利润税后_data = []
+        息税前经营利润_data = []
         折旧及摊销合计_data = []
         资本支出总额_data = []
         营运资本变化量_data = []
         FCFF_data = []
         
         for i, col in enumerate(date_columns):
-            # 1. 息税前经营利润税后
+            # 1. 息税前经营利润（税前）
             ebit = 息税前经营利润_row[col].values[0] if len(息税前经营利润_row) > 0 else 0
+            if pd.notna(ebit):
+                息税前经营利润_data.append(round(float(ebit) / 1e8, 1))
+            else:
+                ebit = 0
+                息税前经营利润_data.append(None)
+            
+            # 2. 实际所得税税率（用于FCFF计算）
             tax_rate = 实际所得税税率_row[col].values[0] if len(实际所得税税率_row) > 0 else 0
             
-            if pd.notna(ebit) and pd.notna(tax_rate):
-                # tax_rate 现在是百分比数值（20表示20%），需要除以100
-                ebit_after_tax = float(ebit) * (1 - float(tax_rate) / 100)
-                息税前经营利润税后_data.append(round(ebit_after_tax / 1e8, 0))
-            else:
-                ebit_after_tax = 0
-                息税前经营利润税后_data.append(None)
-            
-            # 2. 折旧及摊销合计
+            # 3. 折旧及摊销合计 = 固定资产折旧 + 无形资产摊销 + 长期待摊费用摊销 + 处置损失 + 固定资产报废损失
             dep1 = 固定资产折旧_row[col].values[0] if len(固定资产折旧_row) > 0 else 0
             dep2 = 无形资产摊销_row[col].values[0] if len(无形资产摊销_row) > 0 else 0
             dep3 = 长期待摊费用摊销_row[col].values[0] if len(长期待摊费用摊销_row) > 0 else 0
@@ -2002,41 +2003,46 @@ class FinancialStatementsReportGenerator:
             total_dep = 0
             for dep in [dep1, dep2, dep3, dep4, dep5]:
                 if pd.notna(dep):
-                    total_dep += float(dep)
+                    total_dep += abs(float(dep))  # 使用绝对值
             
             if total_dep != 0:
-                折旧及摊销合计_data.append(round(total_dep / 1e8, 0))
+                折旧及摊销合计_data.append(round(total_dep / 1e8, 1))
             else:
                 折旧及摊销合计_data.append(None)
             
-            # 3. 资本支出
+            # 4. 资本支出总额
             capex = 资本支出总额_row[col].values[0] if len(资本支出总额_row) > 0 else 0
             if pd.notna(capex):
-                资本支出总额_data.append(round(float(capex) / 1e8, 0))
+                资本支出总额_data.append(round(float(capex) / 1e8, 1))
             else:
+                capex = 0
                 资本支出总额_data.append(None)
             
-            # 4. 营运资本变化量（当期 - 上期，日期列是倒序的，所以上期是 i+1）
-            current_wc = 周转性经营投入_row[col].values[0] if len(周转性经营投入_row) > 0 else 0
-            if i < len(date_columns) - 1:
-                prev_col = date_columns[i+1]
+            # 5. 营运资本变化量 = 当期周转性经营投入 - 上期周转性经营投入
+            # 注意：date_columns是从远到近排列的，所以i是较旧的日期，i+1是较新的日期
+            # 对于第一个日期（最旧的），没有上期数据，营运资本变化量为None
+            if i == 0:
+                wc_change = 0
+                营运资本变化量_data.append(None)
+            else:
+                current_wc = 周转性经营投入_row[col].values[0] if len(周转性经营投入_row) > 0 else 0
+                prev_col = date_columns[i-1]  # i-1是上一期（更旧的日期）
                 prev_wc = 周转性经营投入_row[prev_col].values[0] if len(周转性经营投入_row) > 0 else 0
                 if pd.notna(current_wc) and pd.notna(prev_wc):
                     wc_change = float(current_wc) - float(prev_wc)
-                    营运资本变化量_data.append(round(wc_change / 1e8, 0))
+                    营运资本变化量_data.append(round(wc_change / 1e8, 1))
                 else:
                     wc_change = 0
                     营运资本变化量_data.append(None)
-            else:
-                wc_change = 0
-                营运资本变化量_data.append(None)
             
-            # 5. FCFF = 息税前经营利润税后 + 折旧摊销 - 资本支出 - 营运资本变化量
-            fcff = ebit_after_tax + total_dep
-            if pd.notna(capex):
-                fcff -= float(capex)
-            fcff -= wc_change
-            FCFF_data.append(round(fcff / 1e8, 0))
+            # 6. FCFF = 息税前经营利润 × (1 - 实际所得税税率) + 折旧及摊销合计 - 资本支出总额 - 营运资本变化量
+            if pd.notna(ebit) and pd.notna(tax_rate):
+                ebit_after_tax = float(ebit) * (1 - float(tax_rate) / 100)
+            else:
+                ebit_after_tax = 0
+            
+            fcff = ebit_after_tax + total_dep - float(capex) - wc_change
+            FCFF_data.append(round(fcff / 1e8, 1))
         
         # 构建图表配置
         chart = {
@@ -2048,7 +2054,7 @@ class FinancialStatementsReportGenerator:
                 'series': {
                     '息税前经营利润': {
                         'type': 'bar',
-                        'data': 息税前经营利润税后_data
+                        'data': 息税前经营利润_data
                     },
                     '折旧及摊销合计': {
                         'type': 'bar',
@@ -2126,29 +2132,33 @@ class FinancialStatementsReportGenerator:
             # 3. 资本支出总额
             capex = 资本支出总额_row[col].values[0] if len(资本支出总额_row) > 0 else 0
             
-            # 4. 营运资本变化量（当期 - 上期，日期列是倒序的，所以上期是 i+1）
-            current_wc = 周转性经营投入_row[col].values[0] if len(周转性经营投入_row) > 0 else 0
-            if i < len(date_columns) - 1:
-                prev_col = date_columns[i+1]
+            # 4. 营运资本变化量 = 当期周转性经营投入 - 上期周转性经营投入
+            # 注意：date_columns是从远到近排列的，所以i是较旧的日期，i+1是较新的日期
+            # 对于第一个日期（最旧的），没有上期数据，营运资本变化量为0
+            if i == 0:
+                wc_change = 0
+            else:
+                current_wc = 周转性经营投入_row[col].values[0] if len(周转性经营投入_row) > 0 else 0
+                prev_col = date_columns[i-1]  # i-1是上一期（更旧的日期）
                 prev_wc = 周转性经营投入_row[prev_col].values[0] if len(周转性经营投入_row) > 0 else 0
                 if pd.notna(current_wc) and pd.notna(prev_wc):
                     wc_change = float(current_wc) - float(prev_wc)
                 else:
                     wc_change = 0
-            else:
-                wc_change = 0
             
-            # 5. 债务变化（当期 - 上期，日期列是倒序的，所以上期是 i+1）
-            current_debt = 有息债务_row[col].values[0] if len(有息债务_row) > 0 else 0
-            if i < len(date_columns) - 1:
-                prev_col = date_columns[i+1]
+            # 5. 债务变化 = 当期有息债务 - 上期有息债务
+            # 注意：date_columns是从远到近排列的
+            # 对于第一个日期（最旧的），没有上期数据，债务变化为0
+            if i == 0:
+                debt_change = 0
+            else:
+                current_debt = 有息债务_row[col].values[0] if len(有息债务_row) > 0 else 0
+                prev_col = date_columns[i-1]  # i-1是上一期（更旧的日期）
                 prev_debt = 有息债务_row[prev_col].values[0] if len(有息债务_row) > 0 else 0
                 if pd.notna(current_debt) and pd.notna(prev_debt):
                     debt_change = float(current_debt) - float(prev_debt)
                 else:
                     debt_change = 0
-            else:
-                debt_change = 0
             
             # 6. FCFE = 净利润 + 折旧摊销 - 资本支出 - 营运资本变化量 + 债务变化（原始值，未缩放）
             if pd.notna(净利润):

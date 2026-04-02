@@ -298,6 +298,14 @@ class FinancialDataUpdater:
                 # 按报告期排序
                 df = df.sort_values('end_date', ascending=False)
                 
+                # 去重：对于同一end_date的多条记录，保留cash_div最大的那条
+                # 这样可以保留"实施"记录而丢弃"预案"等cash_div为0的记录
+                original_count = len(df)
+                df = df.sort_values('cash_div', ascending=False).drop_duplicates(subset=['end_date'], keep='first')
+                df = df.sort_values('end_date', ascending=False)  # 重新按日期排序
+                if len(df) < original_count:
+                    self.logger.debug(f"{ts_code} 去重后: {original_count} → {len(df)} 条（保留cash_div最大的记录）")
+                
                 # 重命名列为中文
                 df_renamed = df.rename(columns={
                     'end_date': '报告期',
