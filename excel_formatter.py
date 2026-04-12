@@ -131,8 +131,8 @@ def save_formatted_balance_sheet(df: pd.DataFrame, filename: str,
                 # 数字格式
                 if c_idx > 1 and isinstance(value, (int, float)):
                     if is_ratio:
-                        # 比率类型：显示为百分比，1位小数
-                        cell.number_format = '0.0%'
+                        # 比率类型：数值已经是百分比（如14.98表示14.98%），直接追加%符号
+                        cell.number_format = '0.0"%"'
                     else:
                         # 金额类型：千分位分隔，无小数
                         cell.number_format = '#,##0'
@@ -241,7 +241,8 @@ def save_formatted_income_statement(df: pd.DataFrame, filename: str,
                 # 数字格式
                 if c_idx > 1 and isinstance(value, (int, float)):
                     if is_ratio:
-                        cell.number_format = '0.0%'
+                        # 比率类型：数值已经是百分比（如14.98表示14.98%），直接追加%符号
+                        cell.number_format = '0.0"%"'
                     else:
                         cell.number_format = '#,##0'
     
@@ -350,7 +351,8 @@ def save_formatted_cashflow_statement(df: pd.DataFrame, filename: str,
                 # 数字格式
                 if c_idx > 1 and isinstance(value, (int, float)):
                     if is_ratio:
-                        cell.number_format = '0.0%'
+                        # 比率类型：数值已经是百分比（如14.98表示14.98%），直接追加%符号
+                        cell.number_format = '0.0"%"'
                     else:
                         cell.number_format = '#,##0'
     

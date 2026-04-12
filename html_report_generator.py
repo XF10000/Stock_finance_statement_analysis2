@@ -84,13 +84,23 @@ class FinancialStatementsReportGenerator:
                 revenue_data = self._extract_chart_data(income_data, date_columns, {
                     'bar': ['营业收入']
                 })
-                # 合并数据
-                chart['data']['series'].update(revenue_data['series'])
-                # 添加计算字段
-                chart['calculated_fields'] = {
-                    '经营资本-营业收入比例': ('周转性经营投入合计', '营业收入'),
-                    '存货-营业收入比例': ('存货', '营业收入')
-                }
+                # 长期经营资产变化图表需要营业收入作为折线
+                if chart['id'] == 'chart_long_term_assets':
+                    # 将营业收入设置为折线类型，并标注为右轴
+                    revenue_data['series']['营业收入']['type'] = 'line'
+                    # 重命名系列以标注右轴
+                    revenue_data['series']['营业收入(右轴)'] = revenue_data['series'].pop('营业收入')
+                    # 合并数据
+                    chart['data']['series'].update(revenue_data['series'])
+                    # 不需要计算字段
+                else:
+                    # 合并数据
+                    chart['data']['series'].update(revenue_data['series'])
+                    # 添加计算字段
+                    chart['calculated_fields'] = {
+                        '经营资本-营业收入比例': ('周转性经营投入合计', '营业收入'),
+                        '存货-营业收入比例': ('存货', '营业收入')
+                    }
         
         charts_config.extend(balance_charts)
         
@@ -334,9 +344,10 @@ class FinancialStatementsReportGenerator:
         chart3 = {
             'id': 'chart_long_term_assets',
             'title': '长期经营资产变化',
-            'type': 'stacked_bar',
+            'type': 'stacked_bar_line',
             'data': self._extract_chart_data(df, date_columns, {
-                'bar': filtered_lta_fields
+                'bar': filtered_lta_fields,
+                'line': ['营业收入']
             }),
             'colors': {
                 '固定资产': '#E6E6FA',
@@ -354,10 +365,13 @@ class FinancialStatementsReportGenerator:
                 '长期待摊费用': '#00A6D6',
                 '其他非流动资产': '#4BC0D9',
                 '递延所得税资产': '#7ED5EA',
-                '递延所得税负债(减项)': '#ADD8E6'
+                '递延所得税负债(减项)': '#ADD8E6',
+                '营业收入(右轴)': self.COLORS['blue']
             },
-            'y_axis_names': ['亿元', ''],
-            'show_values': False
+            'y_axis_names': ['亿元', '亿元'],
+            'show_values': False,
+            'line_format': 'number',  # 营业收入显示为数字而非百分比
+            'needs_income_data': True  # 标记需要利润表数据
         }
         charts.append(chart3)
         
