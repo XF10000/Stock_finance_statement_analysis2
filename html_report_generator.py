@@ -575,7 +575,7 @@ class FinancialStatementsReportGenerator:
                 asset_loss = 资产减值损失[i] if 资产减值损失[i] is not None else 0
                 credit_loss = 信用减值损失[i] if 信用减值损失[i] is not None else 0
                 if 营业收入[i] is not None and 营业收入[i] != 0:
-                    经营资产减值损失率_data.append(((asset_loss + credit_loss) / 营业收入[i]) * 100)
+                    经营资产减值损失率_data.append((asset_loss + credit_loss) / 营业收入[i])
                 else:
                     经营资产减值损失率_data.append(None)
             else:
@@ -591,7 +591,7 @@ class FinancialStatementsReportGenerator:
             
             # 4. 营业外收支净额率 = 营业外收支净额 / 营业收入
             if 营业外收支净额_data[i] is not None and 营业收入 and i < len(营业收入) and 营业收入[i] is not None and 营业收入[i] != 0:
-                营业外收支净额率_data.append((营业外收支净额_data[i] / 营业收入[i]) * 100)
+                营业外收支净额率_data.append(营业外收支净额_data[i] / 营业收入[i])
             else:
                 营业外收支净额率_data.append(None)
             
@@ -662,7 +662,7 @@ class FinancialStatementsReportGenerator:
                 avg_ic = (invested_capital_data[i] + invested_capital_data[i-1]) / 2
                 nopat = 息前税后经营利润[i] if i < len(息前税后经营利润) and 息前税后经营利润[i] is not None else 0
                 if avg_ic != 0:
-                    roic_data.append((nopat / avg_ic) * 100)
+                    roic_data.append(nopat / avg_ic)
                 else:
                     roic_data.append(None)
             else:
@@ -674,7 +674,7 @@ class FinancialStatementsReportGenerator:
                 prev_nopat = 息前税后经营利润[i-1] if i-1 < len(息前税后经营利润) and 息前税后经营利润[i-1] is not None else 0
                 
                 if prev_nopat != 0:
-                    nopat_growth_data.append(((current_nopat - prev_nopat) / prev_nopat) * 100)
+                    nopat_growth_data.append((current_nopat - prev_nopat) / prev_nopat)
                 else:
                     nopat_growth_data.append(None)
             else:
@@ -747,7 +747,7 @@ class FinancialStatementsReportGenerator:
                 nopat = 息前税后经营利润[i] if i < len(息前税后经营利润) and 息前税后经营利润[i] is not None else 0
                 
                 if avg_ic != 0:
-                    roic_data.append((nopat / avg_ic) * 100)
+                    roic_data.append(nopat / avg_ic)
                 else:
                     roic_data.append(None)
                 
@@ -756,7 +756,7 @@ class FinancialStatementsReportGenerator:
                 net_profit = 净利润[i] if i < len(净利润) and 净利润[i] is not None else 0
                 
                 if avg_equity != 0:
-                    roe_data.append((net_profit / avg_equity) * 100)
+                    roe_data.append(net_profit / avg_equity)
                 else:
                     roe_data.append(None)
             else:
@@ -1169,7 +1169,7 @@ class FinancialStatementsReportGenerator:
             
             if ebit != 0:
                 ratio = 1 - (ebt / ebit)
-                财务成本负担率_data.append(round(ratio * 100, 2))  # 转换为百分比数值（乘以100），保留2位小数
+                财务成本负担率_data.append(round(ratio, 4))  # 保持小数形式(0-1)，保留4位小数
             else:
                 财务成本负担率_data.append(None)
         
@@ -1244,7 +1244,7 @@ class FinancialStatementsReportGenerator:
                     val = 扩张性资本支出占比_row[col].values[0]
                     if pd.notna(val):
                         # 转换为百分比
-                        扩张性资本支出占比_data.append(round(float(val) * 100, 2))
+                        扩张性资本支出占比_data.append(round(float(val), 4))  # 保持小数形式(0-1)
                     else:
                         扩张性资本支出占比_data.append(None)
                 else:
@@ -1330,8 +1330,8 @@ class FinancialStatementsReportGenerator:
             equity_investment = 长期股权投资[i] if i < len(长期股权投资) and 长期股权投资[i] is not None else 0
             
             if equity_investment != 0:
-                ratio = (equity_income / equity_investment) * 100  # 转换为百分比
-                长期股权投资收益率_data.append(round(ratio, 2))
+                ratio = equity_income / equity_investment  # 保持小数形式(0-1)
+                长期股权投资收益率_data.append(round(ratio, 4))
             else:
                 长期股权投资收益率_data.append(None)
         
@@ -1384,8 +1384,8 @@ class FinancialStatementsReportGenerator:
                             # 转换为数值，处理NaN
                             if pd.notna(val):
                                 if is_ratio:
-                                    # 比率字段：乘以100转换为百分比
-                                    values.append(float(val) * 100)
+                                    # 比率字段：保持小数形式(0-1)，与income_statement_restructure一致
+                                    values.append(float(val))
                                 else:
                                     # 绝对值字段：转换为亿元（假设原始数据单位是元）
                                     values.append(float(val) / 100000000)
@@ -1714,8 +1714,8 @@ class FinancialStatementsReportGenerator:
                 calc_data = []
                 for i in range(len(num_data)):
                     if num_data[i] is not None and den_data[i] is not None and den_data[i] != 0:
-                        # 计算比率并乘以100转换为百分比
-                        calc_data.append((num_data[i] / den_data[i]) * 100)
+                        # 计算比率，保持小数形式(0-1)
+                        calc_data.append(num_data[i] / den_data[i])
                     else:
                         calc_data.append(None)
                 
@@ -1837,7 +1837,7 @@ class FinancialStatementsReportGenerator:
                             var formattedValue;
                             // 判断是否为百分比系列（通过系列名称判断）
                             if (item.seriesName.includes('率') || item.seriesName.includes('比例')) {{
-                                formattedValue = value != null ? value.toFixed(1) + '%' : '-';
+                                formattedValue = value != null ? (value * 100).toFixed(1) + '%' : '-';
                             }} else {{
                                 // 使用bar_format决定小数位数
                                 var decimals = {1 if bar_format == 'decimal' else 1};
@@ -1904,7 +1904,7 @@ class FinancialStatementsReportGenerator:
                         position: 'right',
                         axisLabel: {{
                             formatter: function(value) {{
-                                return {'value.toFixed(1) + "%"' if line_format == 'percent' else 'value.toFixed(0)'};
+                                return {'(value * 100).toFixed(1) + "%"' if line_format == 'percent' else 'value.toFixed(0)'};
                             }}
                         }}
                     }}
@@ -1917,7 +1917,7 @@ class FinancialStatementsReportGenerator:
                 if (s.label && s.label.formatter) {{
                     if (s.label.formatter === '__FORMATTER_PERCENT__') {{
                         s.label.formatter = function(params) {{
-                            return params.value != null ? params.value.toFixed(1) + '%' : '';
+                            return params.value != null ? (params.value * 100).toFixed(1) + '%' : '';
                         }};
                     }} else if (s.label.formatter === '__FORMATTER_DECIMAL__') {{
                         s.label.formatter = function(params) {{

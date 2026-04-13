@@ -687,11 +687,8 @@ class AnnualReportGenerator:
                         if i < len(data_values_reversed):
                             value = data_values_reversed[i]
                             if value is not None:
-                                fval = float(value)
-                                # 图表数据中比率字段已被html_report_generator乘以100，需除以100还原为小数
-                                if series_name in _pct_fields:
-                                    fval = fval / 100
-                                summary_data[date_col].append(round(fval, 4))
+                                # 图表数据中比率字段已为小数形式(0-1)，直接使用
+                                summary_data[date_col].append(round(float(value), 4))
                             else:
                                 summary_data[date_col].append(None)
                         else:
@@ -1088,11 +1085,8 @@ class AnnualReportGenerator:
                         if i < len(data_values):
                             value = data_values[i]
                             if value is not None:
-                                fval = float(value)
-                                # 图表数据中比率字段已被html_report_generator乘以100，需除以100还原为小数
-                                if series_name in _pct_fields:
-                                    fval = fval / 100
-                                summary_data[date_col].append(round(fval, 4))
+                                # 图表数据中比率字段已为小数形式(0-1)，直接使用
+                                summary_data[date_col].append(round(float(value), 4))
                             else:
                                 summary_data[date_col].append(None)
                         else:
