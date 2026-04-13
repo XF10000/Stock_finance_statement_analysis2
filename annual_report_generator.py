@@ -581,7 +581,7 @@ class AnnualReportGenerator:
                 ('实际所得税税率', income_data, '实际所得税税率'),
             ]
             
-            # 百分比字段列表（值为小数0-1，需要乘以100后存储）
+            # 百分比字段列表（值为小数0-1，与income_statement_restructure保持一致）
             _pct_fields = {
                 '实际所得税税率', '营业成本率', '毛利率', '净利润率', '息税前经营利润率',
                 '销售费用率', '管理费用率', '研发费用率', '营业税金及附加率', '资产减值损失率',
@@ -597,10 +597,8 @@ class AnnualReportGenerator:
                         if date_col in df.columns:
                             value = field_row[date_col].values[0]
                             if pd.notna(value):
-                                fval = float(value)
-                                if field_name in _pct_fields:
-                                    fval = fval * 100  # 小数转百分比数值
-                                summary_data[date_col].append(round(fval, 2))
+                                # 保持小数形式(0-1)，与income_statement_restructure一致
+                                summary_data[date_col].append(round(float(value), 4))
                             else:
                                 summary_data[date_col].append(None)
                         else:
@@ -689,8 +687,11 @@ class AnnualReportGenerator:
                         if i < len(data_values_reversed):
                             value = data_values_reversed[i]
                             if value is not None:
-                                # 图表数据中比率字段已被html_report_generator乘以100，直接使用
-                                summary_data[date_col].append(round(float(value), 2))
+                                fval = float(value)
+                                # 图表数据中比率字段已被html_report_generator乘以100，需除以100还原为小数
+                                if series_name in _pct_fields:
+                                    fval = fval / 100
+                                summary_data[date_col].append(round(fval, 4))
                             else:
                                 summary_data[date_col].append(None)
                         else:
@@ -835,8 +836,8 @@ class AnnualReportGenerator:
                             # 整数格式，带千分位分隔符
                             cell.number_format = '#,##0'
                         elif indicator_name in percentage_fields:
-                            # 百分比格式，1位小数（数值已经是百分比）
-                            cell.number_format = '0.0"%"'
+                            # 百分比格式，1位小数（数值为小数0-1，Excel自动乘100显示）
+                            cell.number_format = '0.0%'
                         elif indicator_name in ratio_fields:
                             # 比率格式，2位小数
                             cell.number_format = '0.00'
@@ -999,10 +1000,8 @@ class AnnualReportGenerator:
                         if date_col in df.columns:
                             value = field_row[date_col].values[0]
                             if pd.notna(value):
-                                fval = float(value)
-                                if field_name in _pct_fields:
-                                    fval = fval * 100  # 小数转百分比数值
-                                summary_data[date_col].append(round(fval, 2))
+                                # 保持小数形式(0-1)，与income_statement_restructure一致
+                                summary_data[date_col].append(round(float(value), 4))
                             else:
                                 summary_data[date_col].append(None)
                         else:
@@ -1089,8 +1088,11 @@ class AnnualReportGenerator:
                         if i < len(data_values):
                             value = data_values[i]
                             if value is not None:
-                                # 图表数据中比率字段已被html_report_generator乘以100，直接使用
-                                summary_data[date_col].append(round(float(value), 2))
+                                fval = float(value)
+                                # 图表数据中比率字段已被html_report_generator乘以100，需除以100还原为小数
+                                if series_name in _pct_fields:
+                                    fval = fval / 100
+                                summary_data[date_col].append(round(fval, 4))
                             else:
                                 summary_data[date_col].append(None)
                         else:
@@ -1217,8 +1219,8 @@ class AnnualReportGenerator:
                                         # 整数格式，带千分位分隔符
                                         cell.number_format = '#,##0'
                                     elif indicator_name in percentage_fields:
-                                        # 百分比格式，1位小数（数值已经是百分比）
-                                        cell.number_format = '0.0"%"'
+                                        # 百分比格式，1位小数（数值为小数0-1，Excel自动乘100显示）
+                                        cell.number_format = '0.0%'
                                     elif indicator_name in ratio_fields:
                                         # 比率格式，2位小数
                                         cell.number_format = '0.00'
