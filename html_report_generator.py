@@ -2051,7 +2051,7 @@ class FinancialStatementsReportGenerator:
             
             # 6. FCFF = 息税前经营利润 × (1 - 实际所得税税率) + 折旧及摊销合计 - 资本支出总额 - 营运资本变化量
             if pd.notna(ebit) and pd.notna(tax_rate):
-                ebit_after_tax = float(ebit) * (1 - float(tax_rate) / 100)
+                ebit_after_tax = float(ebit) * (1 - float(tax_rate))
             else:
                 ebit_after_tax = 0
             

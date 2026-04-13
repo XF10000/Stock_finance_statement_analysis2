@@ -581,6 +581,14 @@ class AnnualReportGenerator:
                 ('实际所得税税率', income_data, '实际所得税税率'),
             ]
             
+            # 百分比字段列表（值为小数0-1，需要乘以100后存储）
+            _pct_fields = {
+                '实际所得税税率', '营业成本率', '毛利率', '净利润率', '息税前经营利润率',
+                '销售费用率', '管理费用率', '研发费用率', '营业税金及附加率', '资产减值损失率',
+                '有息债务率', '财务成本负担率', '扩张性资本支出占长期资产期初净额的比例',
+                '长期股权投资收益率', 'ROIC', 'ROE', '营业外收支及其他占营业收入的比例'
+            }
+            
             for display_name, df, field_name in key_indicators:
                 summary_data['指标'].append(display_name)
                 field_row = df[df['项目'] == field_name]
@@ -589,7 +597,10 @@ class AnnualReportGenerator:
                         if date_col in df.columns:
                             value = field_row[date_col].values[0]
                             if pd.notna(value):
-                                summary_data[date_col].append(round(float(value), 2))
+                                fval = float(value)
+                                if field_name in _pct_fields:
+                                    fval = fval * 100  # 小数转百分比数值
+                                summary_data[date_col].append(round(fval, 2))
                             else:
                                 summary_data[date_col].append(None)
                         else:
@@ -678,6 +689,7 @@ class AnnualReportGenerator:
                         if i < len(data_values_reversed):
                             value = data_values_reversed[i]
                             if value is not None:
+                                # 图表数据中比率字段已被html_report_generator乘以100，直接使用
                                 summary_data[date_col].append(round(float(value), 2))
                             else:
                                 summary_data[date_col].append(None)
@@ -971,6 +983,14 @@ class AnnualReportGenerator:
                 ('实际所得税税率', income_data, '实际所得税税率'),
             ]
             
+            # 百分比字段列表（值为小数0-1，需要乘以100后存储）
+            _pct_fields = {
+                '实际所得税税率', '营业成本率', '毛利率', '净利润率', '息税前经营利润率',
+                '销售费用率', '管理费用率', '研发费用率', '营业税金及附加率', '资产减值损失率',
+                '有息债务率', '财务成本负担率', '扩张性资本支出占长期资产期初净额的比例',
+                '长期股权投资收益率', 'ROIC', 'ROE', '营业外收支及其他占营业收入的比例'
+            }
+            
             for display_name, df, field_name in key_indicators:
                 summary_data['指标'].append(display_name)
                 field_row = df[df['项目'] == field_name]
@@ -979,7 +999,10 @@ class AnnualReportGenerator:
                         if date_col in df.columns:
                             value = field_row[date_col].values[0]
                             if pd.notna(value):
-                                summary_data[date_col].append(round(float(value), 2))
+                                fval = float(value)
+                                if field_name in _pct_fields:
+                                    fval = fval * 100  # 小数转百分比数值
+                                summary_data[date_col].append(round(fval, 2))
                             else:
                                 summary_data[date_col].append(None)
                         else:
@@ -1066,6 +1089,7 @@ class AnnualReportGenerator:
                         if i < len(data_values):
                             value = data_values[i]
                             if value is not None:
+                                # 图表数据中比率字段已被html_report_generator乘以100，直接使用
                                 summary_data[date_col].append(round(float(value), 2))
                             else:
                                 summary_data[date_col].append(None)
