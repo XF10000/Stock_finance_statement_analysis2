@@ -8,7 +8,7 @@ import logging
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union
 from datetime import datetime
 import yaml
 import os
@@ -553,13 +553,14 @@ class FinancialDataUpdater:
         
         self.logger.info("="*60 + "\n")
     
-    def fetch_stock_incremental(self, ts_code: str, target_quarter: str = None) -> bool:
+    def fetch_stock_incremental(self, ts_code: str, target_quarters: Union[str, List[str]] = None) -> bool:
         """
         增量更新单只股票的最新季度数据
         
         Args:
             ts_code: 股票代码
-            target_quarter: 目标季度（如20241231），不指定则自动判断
+            target_quarters: 目标季度，支持单个字符串(如'20241231')或列表(如['20241231','20250331'])
+                           不指定则自动判断
             
         Returns:
             是否成功
@@ -571,42 +572,36 @@ class FinancialDataUpdater:
             # 初始化Tushare客户端
             client = TushareClient(config_path=self.config_path)
             
-            # 如果没有指定目标季度，自动判断最新季度
-            if not target_quarter:
-                now = datetime.now()
-                year = now.year
-                month = now.month
-                
-                # 判断当前应该是哪个季度
-                if month <= 4:
-                    # 1-4月，更新去年Q4数据
-                    target_quarter = f"{year-1}1231"
-                elif month <= 8:
-                    # 5-8月，更新今年Q1数据
-                    target_quarter = f"{year}0331"
-                elif month <= 10:
-                    # 9-10月，更新今年Q2数据
-                    target_quarter = f"{year}0630"
-                else:
-                    # 11-12月，更新今年Q3数据
-                    target_quarter = f"{year}0930"
+            # 如果没有指定目标季度，自动判断
+            if not target_quarters:
+                target_quarters = self._determine_target_quarter_smart()
             
-            # 检查是否已有该季度数据
-            if self.db_manager.check_data_exists(ts_code, target_quarter, 'balancesheet'):
-                self.logger.debug(f"{ts_code} {target_quarter} 数据已存在，跳过")
+            # 统一转为列表
+            if isinstance(target_quarters, str):
+                target_quarters = [target_quarters]
+            
+            # 检查所有目标季度是否都已存在
+            all_exist = True
+            for tq in target_quarters:
+                if not self.db_manager.check_data_exists(ts_code, tq, 'balancesheet'):
+                    all_exist = False
+                    break
+            
+            if all_exist:
+                self.logger.debug(f"{ts_code} {target_quarters} 数据已存在，跳过")
                 with self.stats_lock:
                     self.stats['skipped'] += 1
                 return True
             
-            # start_date：报告期前30天；end_date：今天（ann_date 可能在报告期数月后）
-            # 例：2025Q4 报告期=20251231，但年报通常在2026年3-4月公告，
-            # 若 end_date 截止到20260130，会漏掉后续公告的年报
+            # start_date：最早季度前30天；end_date：今天
+            # 多个季度时，取最早季度的前30天作为start_date
             from datetime import timedelta
-            tq_dt = datetime.strptime(target_quarter, '%Y%m%d')
+            earliest_quarter = min(target_quarters)
+            tq_dt = datetime.strptime(earliest_quarter, '%Y%m%d')
             start_date = (tq_dt - timedelta(days=30)).strftime('%Y%m%d')
             end_date   = datetime.now().strftime('%Y%m%d')
             
-            self.logger.info(f"获取 {ts_code} 的 {target_quarter} 季度数据...")
+            self.logger.info(f"获取 {ts_code} 的 {target_quarters} 季度数据...")
             data = client.get_all_financial_data(
                 ts_code=ts_code,
                 start_date=start_date,
@@ -621,7 +616,7 @@ class FinancialDataUpdater:
                     self.stats['failed_stocks'].append(ts_code)
                 return False
             
-            # 保存数据
+            # 保存数据 - 对每个目标季度分别保存
             saved_count = 0
             for table_name in ['balancesheet', 'income', 'cashflow', 'fina_indicator']:
                 if data.get(table_name) is not None and len(data[table_name]) > 0:
@@ -637,18 +632,19 @@ class FinancialDataUpdater:
                     if date_col is None:
                         continue
                     
-                    # 只保存目标季度的数据
-                    df_filtered = df[df[date_col] == target_quarter]
-                    
-                    if len(df_filtered) > 0:
-                        # 放入写入队列，而非直接写入
-                        self.write_queue.put({
-                            'ts_code': ts_code,
-                            'end_date': target_quarter,
-                            'data_type': table_name,
-                            'data': df_filtered
-                        })
-                        saved_count += 1
+                    # 保存所有目标季度的数据
+                    for tq in target_quarters:
+                        df_filtered = df[df[date_col] == tq]
+                        
+                        if len(df_filtered) > 0:
+                            # 放入写入队列，而非直接写入
+                            self.write_queue.put({
+                                'ts_code': ts_code,
+                                'end_date': tq,
+                                'data_type': table_name,
+                                'data': df_filtered
+                            })
+                            saved_count += 1
             
             # 注意：分红数据不在此处更新
             # 请使用 --update-dividend 参数专门更新分红数据
@@ -671,17 +667,17 @@ class FinancialDataUpdater:
                 self.stats['failed_stocks'].append(ts_code)
             return False
     
-    def _determine_target_quarter_smart(self) -> str:
+    def _determine_target_quarter_smart(self) -> List[str]:
         """
         智能判断目标季度（财务数据）
         根据当前月份判断应该尝试获取的季度：
-        - 2-4月：尝试上年Q4
+        - 2-4月：尝试上年Q4 + 本年Q1（A股年报和一季报经常同时披露）
         - 5-7月：尝试本年Q1
         - 8-10月：尝试本年Q2
         - 11-1月：尝试本年Q3
         
         Returns:
-            目标季度字符串，如 '20240930'
+            目标季度字符串列表，如 ['20241231', '20250331']
         """
         now = datetime.now()
         year = now.year
@@ -689,23 +685,24 @@ class FinancialDataUpdater:
         
         # 根据当前月份判断应该尝试获取的季度
         if 2 <= month <= 4:
-            # 2-4月：尝试上年Q4
-            target_quarter = f"{year-1}1231"
-            self.logger.info(f"当前月份 {month}，尝试获取上年Q4: {target_quarter}")
+            # 2-4月：同时尝试上年Q4和本年Q1
+            # A股公司经常在4月同时发布年报和一季报
+            target_quarters = [f"{year-1}1231", f"{year}0331"]
+            self.logger.info(f"当前月份 {month}，尝试获取上年Q4+本年Q1: {target_quarters}")
         elif 5 <= month <= 7:
             # 5-7月：尝试本年Q1
-            target_quarter = f"{year}0331"
-            self.logger.info(f"当前月份 {month}，尝试获取本年Q1: {target_quarter}")
+            target_quarters = [f"{year}0331"]
+            self.logger.info(f"当前月份 {month}，尝试获取本年Q1: {target_quarters}")
         elif 8 <= month <= 10:
             # 8-10月：尝试本年Q2
-            target_quarter = f"{year}0630"
-            self.logger.info(f"当前月份 {month}，尝试获取本年Q2: {target_quarter}")
+            target_quarters = [f"{year}0630"]
+            self.logger.info(f"当前月份 {month}，尝试获取本年Q2: {target_quarters}")
         else:  # 11, 12, 1
             # 11-1月：尝试本年Q3
-            target_quarter = f"{year}0930"
-            self.logger.info(f"当前月份 {month}，尝试获取本年Q3: {target_quarter}")
+            target_quarters = [f"{year}0930"]
+            self.logger.info(f"当前月份 {month}，尝试获取本年Q3: {target_quarters}")
         
-        return target_quarter
+        return target_quarters
     
     def _batch_check_missing_stocks(self, stocks: List[Dict], target_quarter: str) -> List[Dict]:
         """
@@ -750,16 +747,18 @@ class FinancialDataUpdater:
             # 出错时返回所有股票（保守策略）
             return stocks
     
-    def update_latest_quarter(self, target_quarter: str = None, 
+    def update_latest_quarter(self, target_quarter: Union[str, List[str]] = None, 
                              calculate_indicators: bool = True):
         """
         增量更新最新季度的数据
         优化：
         1. 智能季度判断：根据数据库中财务数据的最新时间确定目标季度
         2. 批量检查：先批量检查数据库，只对缺失的股票调用 API
+        3. 多季度支持：2-4月同时获取上年Q4和本年Q1
         
         Args:
-            target_quarter: 目标季度（如20241231），不指定则自动判断
+            target_quarter: 目标季度，支持字符串(如'20241231')或列表(如['20241231','20250331'])
+                          不指定则自动判断
             calculate_indicators: 是否自动计算核心指标
         """
         self.logger.info("="*60)
@@ -775,76 +774,88 @@ class FinancialDataUpdater:
         
         # 优化1: 智能季度判断 - 如果未指定目标季度，根据数据库中的最新数据判断
         if not target_quarter:
-            target_quarter = self._determine_target_quarter_smart()
-            self.logger.info(f"智能判断目标季度: {target_quarter}")
+            target_quarters = self._determine_target_quarter_smart()
+            self.logger.info(f"智能判断目标季度: {target_quarters}")
         else:
-            self.logger.info(f"指定目标季度: {target_quarter}")
+            # 统一转为列表
+            if isinstance(target_quarter, str):
+                target_quarters = [target_quarter]
+            else:
+                target_quarters = target_quarter
+            self.logger.info(f"指定目标季度: {target_quarters}")
         
         self.logger.info(f"股票总数: {len(stocks)}")
         
-        # 优化2: 批量检查缺失数据
-        self.logger.info("\n批量检查缺失数据...")
-        stocks_need_update = self._batch_check_missing_stocks(stocks, target_quarter)
-        
-        if not stocks_need_update:
-            self.logger.info("✓ 所有股票的数据都已是最新，无需更新")
-            return
-        
-        self.logger.info(f"需要更新的股票: {len(stocks_need_update)} 只")
-        self.logger.info(f"跳过的股票: {len(stocks) - len(stocks_need_update)} 只")
-        
-        # 重置统计
-        self.stats = {
-            'total': len(stocks_need_update),
-            'success': 0,
-            'failed': 0,
-            'skipped': len(stocks) - len(stocks_need_update),
-            'start_time': time.time(),
-            'failed_stocks': []
-        }
-        
-        # 启动批量写入线程
-        self.start_batch_writer()
-        
-        try:
-            # 使用线程池更新（只更新需要的股票）
-            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                futures = {
-                    executor.submit(self.fetch_stock_incremental, stock['ts_code'], target_quarter): stock
-                    for stock in stocks_need_update
-                }
-                
-                # 使用 tqdm 进度条
-                with tqdm(total=len(stocks_need_update), desc=f"更新 {target_quarter}", unit="只") as pbar:
-                    for future in as_completed(futures):
-                        stock = futures[future]
-                        try:
-                            future.result()
-                        except Exception as e:
-                            self.logger.error(f"处理 {stock['ts_code']} 时发生异常: {e}")
-                        
-                        # 更新进度条
-                        pbar.update(1)
-                        pbar.set_postfix({
-                            '成功': self.stats['success'],
-                            '失败': self.stats['failed'],
-                            '跳过': self.stats['skipped']
-                        })
-        finally:
-            # 停止批量写入线程并等待队列清空
-            self.stop_batch_writer()
-        
-        # 打印统计
-        self._print_final_stats()
-        
-        # 计算核心指标
-        if calculate_indicators and self.stats['success'] > 0:
-            self.logger.info("\n" + "="*60)
-            self.logger.info("开始计算核心指标...")
-            self.logger.info("="*60)
+        # 对每个目标季度分别处理
+        for tq in target_quarters:
+            self.logger.info(f"\n{'='*60}")
+            self.logger.info(f"处理季度: {tq}")
+            self.logger.info(f"{'='*60}")
             
-            self.calculate_core_indicators_batch(target_quarter)
-            self.calculate_ttm_indicators_batch(target_quarter=target_quarter)
+            # 批量检查缺失数据
+            self.logger.info("\n批量检查缺失数据...")
+            stocks_need_update = self._batch_check_missing_stocks(stocks, tq)
+            
+            if not stocks_need_update:
+                self.logger.info(f"✓ 所有股票的 {tq} 数据都已是最新，无需更新")
+                continue
+            
+            self.logger.info(f"需要更新的股票: {len(stocks_need_update)} 只")
+            self.logger.info(f"跳过的股票: {len(stocks) - len(stocks_need_update)} 只")
+            
+            # 重置统计
+            self.stats = {
+                'total': len(stocks_need_update),
+                'success': 0,
+                'failed': 0,
+                'skipped': len(stocks) - len(stocks_need_update),
+                'start_time': time.time(),
+                'failed_stocks': []
+            }
+            
+            # 启动批量写入线程
+            self.start_batch_writer()
+            
+            try:
+                # 使用线程池更新（只更新需要的股票）
+                with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                    futures = {
+                        executor.submit(self.fetch_stock_incremental, stock['ts_code'], tq): stock
+                        for stock in stocks_need_update
+                    }
+                    
+                    # 使用 tqdm 进度条
+                    with tqdm(total=len(stocks_need_update), desc=f"更新 {tq}", unit="只") as pbar:
+                        for future in as_completed(futures):
+                            stock = futures[future]
+                            try:
+                                future.result()
+                            except Exception as e:
+                                self.logger.error(f"处理 {stock['ts_code']} 时发生异常: {e}")
+                            
+                            # 更新进度条
+                            pbar.update(1)
+                            pbar.set_postfix({
+                                '成功': self.stats['success'],
+                                '失败': self.stats['failed'],
+                                '跳过': self.stats['skipped']
+                            })
+            finally:
+                # 停止批量写入线程并等待队列清空
+                self.stop_batch_writer()
+            
+            # 打印统计
+            self._print_final_stats()
+        
+        # 计算核心指标（对所有目标季度）
+        if calculate_indicators and self.stats.get('success', 0) > 0:
+            for tq in target_quarters:
+                self.logger.info("\n" + "="*60)
+                self.logger.info(f"计算 {tq} 核心指标...")
+                self.logger.info("="*60)
+                
+                self.calculate_core_indicators_batch(tq)
+                self.calculate_ttm_indicators_batch(target_quarter=tq)
             
             # 更新分红数据（只更新缺失的股票）
             self.logger.info("\n" + "="*60)
@@ -1654,12 +1665,12 @@ def main():
                 logger.error(f"\n✗ {args.update_stock} 完整历史数据更新失败")
         else:
             # 增量更新最新季度
-            target_quarter = args.quarter if args.quarter else updater._determine_target_quarter_smart()
-            logger.info(f"目标季度: {target_quarter}")
+            target_quarters = [args.quarter] if args.quarter else updater._determine_target_quarter_smart()
+            logger.info(f"目标季度: {target_quarters}")
             
             updater.start_batch_writer()
             try:
-                success = updater.fetch_stock_incremental(args.update_stock, target_quarter)
+                success = updater.fetch_stock_incremental(args.update_stock, target_quarters)
             finally:
                 updater.stop_batch_writer()
             if success:
@@ -1669,25 +1680,26 @@ def main():
                 else:
                     logger.info(f"\n✓ {args.update_stock} 最新季度数据更新成功")
                 
-                # 计算核心指标（只计算目标季度，不重算全部历史）
+                # 计算核心指标（对每个目标季度分别计算）
                 if not args.no_indicators:
-                    logger.info(f"\n计算 {target_quarter} 核心指标...")
-                    try:
-                        updater.calculate_core_indicators_batch(
-                            updated_stocks=[args.update_stock],
-                            target_quarter=target_quarter
-                        )
-                        logger.info("✓ 年报核心指标计算完成")
-                    except Exception as e:
-                        logger.error(f"计算年报核心指标失败: {e}")
-                    try:
-                        updater.calculate_ttm_indicators_batch(
-                            updated_stocks=[args.update_stock],
-                            target_quarter=target_quarter
-                        )
-                        logger.info("✓ TTM 核心指标计算完成")
-                    except Exception as e:
-                        logger.error(f"计算 TTM 核心指标失败: {e}")
+                    for tq in target_quarters:
+                        logger.info(f"\n计算 {tq} 核心指标...")
+                        try:
+                            updater.calculate_core_indicators_batch(
+                                updated_stocks=[args.update_stock],
+                                target_quarter=tq
+                            )
+                            logger.info(f"✓ {tq} 年报核心指标计算完成")
+                        except Exception as e:
+                            logger.error(f"计算 {tq} 年报核心指标失败: {e}")
+                        try:
+                            updater.calculate_ttm_indicators_batch(
+                                updated_stocks=[args.update_stock],
+                                target_quarter=tq
+                            )
+                            logger.info(f"✓ {tq} TTM 核心指标计算完成")
+                        except Exception as e:
+                            logger.error(f"计算 {tq} TTM 核心指标失败: {e}")
                     
                     # 更新分红数据
                     try:
